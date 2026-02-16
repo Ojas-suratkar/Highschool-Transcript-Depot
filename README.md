@@ -193,4 +193,3 @@ This is a private project. For questions or issues, contact the development team
 ## 📄 License
 
 Proprietary - All rights reserved
-  
