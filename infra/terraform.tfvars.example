@@ -1,0 +1,11 @@
+project_id = "your-gcp-project-id"
+region     = "us-west2"
+
+instance_name = "student-transcripts"
+db_name       = "transcripts"
+db_user       = "admin_user"
+
+db_password = "your-secure-password-here"  
+enable_public_ip = true
+authorized_cidrs = []
+

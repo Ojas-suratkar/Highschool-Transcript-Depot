@@ -1,0 +1,45 @@
+version: '3.8'
+services:
+  db:
+    image: postgres:15
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: transcripthub
+    ports:
+      - '5432:5432'
+    volumes:
+      - db_data:/var/lib/postgresql/data
+
+  backend:
+    build: ./apps/backend
+    env_file: ./apps/backend/.env
+    ports:
+      - '8000:8000'
+    depends_on:
+      - db
+      - cloudsql-proxy
+    environment:
+      - JWT_SECRET=change-me
+      # Force backend to use the Cloud SQL Proxy service inside compose network
+      - DATABASE_URL=postgresql+asyncpg://admin_user:Transcript123!@cloudsql-proxy:5432/transcripts
+    
+
+  redis:
+    image: redis:7
+    ports:
+      - '6379:6379'
+
+  cloudsql-proxy:
+    image: gcr.io/cloudsql-docker/gce-proxy:1.33.1
+    # mount a service account JSON at ./apps/backend/cloudsql/service-account.json
+    volumes:
+      - ./apps/backend/cloudsql:/secrets
+    command: ["/cloud_sql_proxy", "-instances=${CLOUDSQL_INSTANCE}=tcp:0.0.0.0:5432", "-credential_file=/secrets/service-account.json"]
+    ports:
+      # expose proxy to host on 5433 to allow importing the dump from host
+      - '5433:5432'
+    restart: unless-stopped
+
+volumes:
+  db_data:

@@ -1,0 +1,67 @@
+# Dependencies
+node_modules/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+
+# Python virtual environment
+.venv/
+.venv-3.11/
+venv/
+env/
+
+# Build artifacts
+dist/
+apps/frontend/dist/
+*.egg-info/
+build/
+
+# Environment variables
+.env
+.env.local
+.env.*
+apps/backend/.env
+
+# Cloud SQL credentials (NEVER commit these!)
+apps/backend/cloudsql/service-account.json
+cloudsql/
+*.json
+
+# Database
+*.db
+*.sqlite
+*.sqlite3
+transcripts.db
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+npm-debug.log*
+pnpm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Terraform
+infra/.terraform/
+infra/*.tfstate
+infra/*.tfstate.backup
+infra/.terraform.lock.hcl
+infra/terraform.tfvars
+infra/*.tfvars
+
+# Temporary files
+*.tmp
+*.temp
+.cache/
