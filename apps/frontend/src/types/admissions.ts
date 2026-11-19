@@ -40,8 +40,8 @@ export interface Institution {
 // Academic Terms
 export interface AcademicTerm {
   id: string;
-  name: string; // e.g., "Fall 2025"
-  semester: 'fall' | 'spring' | 'summer' | 'winter';
+  term_name: string; // e.g., "Fall 2025"
+  term: 'fall' | 'spring' | 'summer' | 'winter';
   year: number;
   isCurrent: boolean;
 }

@@ -25,3 +25,17 @@ class VerifyOTPVerifyRequest(BaseModel):
 class VerifyOTPResponse(BaseModel):
     success: bool
     profile_id: str
+
+
+from uuid import UUID
+from datetime import datetime
+
+class JobResponse(BaseModel):
+    id: UUID
+    job_type: str
+    status: str
+    created_at: datetime
+    error: Optional[str] = None
+
+    class Config:
+        from_attributes = True

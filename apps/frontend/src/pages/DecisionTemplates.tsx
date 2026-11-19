@@ -5,6 +5,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
+import { formatDatePST } from '@/lib/utils';
 import {
   Select,
   SelectContent,
@@ -59,7 +60,10 @@ export default function DecisionTemplates() {
   const previewContent = selectedTemplate.content
     .replace(/{{student_name}}/g, 'John Doe')
     .replace(/{{program}}/g, 'Computer Science (MS)')
-    .replace(/{{decision_date}}/g, new Date().toLocaleDateString());
+    .replace(
+      /{{decision_date}}/g,
+      formatDatePST(new Date())
+    );
 
   return (
     <div className="space-y-6">
@@ -182,4 +186,3 @@ export default function DecisionTemplates() {
     </div>
   );
 }
-

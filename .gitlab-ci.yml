@@ -1,0 +1,95 @@
+stages:
+  - build_backend
+  - build_frontend
+  - deploy_backend
+  - deploy_frontend
+
+variables:
+  GCP_REGION: us-west2
+  AR_REPO: transcript-depot
+  BACKEND_IMAGE: $GCP_REGION-docker.pkg.dev/$GCP_PROJECT_ID/$AR_REPO/transcript-backend
+  FRONTEND_IMAGE: $GCP_REGION-docker.pkg.dev/$GCP_PROJECT_ID/$AR_REPO/transcript-frontend
+
+.build_template:
+  before_script:
+    - test -n "$GCP_SERVICE_KEY"
+    - test -n "$GCP_PROJECT_ID"
+    - cat "$GCP_SERVICE_KEY" | docker login -u _json_key --password-stdin "https://$GCP_REGION-docker.pkg.dev"
+
+build_backend_image:
+  extends: .build_template
+  stage: build_backend
+  script:
+    - docker build --pull --platform linux/amd64 -f apps/backend/Dockerfile -t "$BACKEND_IMAGE:$CI_COMMIT_SHORT_SHA" apps/backend
+    - docker tag "$BACKEND_IMAGE:$CI_COMMIT_SHORT_SHA" "$BACKEND_IMAGE:latest"
+    - docker push "$BACKEND_IMAGE:$CI_COMMIT_SHORT_SHA"
+    - docker push "$BACKEND_IMAGE:latest"
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "main"'
+
+build_frontend_image:
+  extends: .build_template
+  stage: build_frontend
+  script:
+    - docker build --pull --platform linux/amd64 -f apps/frontend/Dockerfile -t "$FRONTEND_IMAGE:$CI_COMMIT_SHORT_SHA" .
+    - docker tag "$FRONTEND_IMAGE:$CI_COMMIT_SHORT_SHA" "$FRONTEND_IMAGE:latest"
+    - docker push "$FRONTEND_IMAGE:$CI_COMMIT_SHORT_SHA"
+    - docker push "$FRONTEND_IMAGE:latest"
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "main"'
+
+deploy_backend_cloud_run:
+  image: gcr.io/google.com/cloudsdktool/cloud-sdk:slim
+  stage: deploy_backend
+  needs:
+    - build_backend_image
+  script:
+    - test -n "$GCP_SERVICE_KEY"
+    - test -n "$GCP_PROJECT_ID"
+    - test -n "$BACKEND_SERVICE"
+    - test -n "$DATABASE_URL"
+    - test -n "$JWT_SECRET"
+    - gcloud auth activate-service-account --key-file="$GCP_SERVICE_KEY"
+    - gcloud config set project "$GCP_PROJECT_ID"
+    - gcloud run services update "$BACKEND_SERVICE" --region "$GCP_REGION" --remove-secrets "GOOGLE_OAUTH_CLIENT_ID,GOOGLE_OAUTH_CLIENT_SECRET,GEMINI_MODEL" || true
+    - _SA_KEY_B64=$(cat "$GCP_SERVICE_KEY" | base64 | tr -d '\n')
+    - >
+      gcloud run deploy "$BACKEND_SERVICE"
+      --image "$BACKEND_IMAGE:$CI_COMMIT_SHORT_SHA"
+      --region "$GCP_REGION"
+      --platform managed
+      --allow-unauthenticated
+      --port 8080
+      --session-affinity
+      --memory 8Gi
+      --cpu 4
+      --no-cpu-throttling
+      --timeout 3600
+      --add-cloudsql-instances "doc-ai-transcript:us-west2:student-transcripts"
+      --set-env-vars "ENV=production,EXTRACTION_CONCURRENCY=12,CLASSIFY_CONCURRENCY=16,GEMINI_VALIDATE_DOCAI=1,GEMINI_COUNT_CROSS_CHECK=1,GEMINI_MAX_CONCURRENT_CALLS=96,AUDIT_CONCURRENCY=40,GEMINI_MAX_RPM=150,DOC_AI_AUTO_TRAIN_AND_DEPLOY=true,DATABASE_URL=$DATABASE_URL,JWT_SECRET=$JWT_SECRET,SECRET_KEY=$JWT_SECRET,DELIVERY_MODE=mock,OTP_DEBUG_RETURN_IN_RESPONSE=false,OTP_TTL_SECONDS=600,OTP_MAX_ATTEMPTS=3,MICROSOFT_CLIENT_ID=$MICROSOFT_CLIENT_ID,MICROSOFT_CLIENT_SECRET=$MICROSOFT_CLIENT_SECRET,MICROSOFT_TENANT_ID=$MICROSOFT_TENANT_ID,MICROSOFT_REDIRECT_URI=$BACKEND_URL/api/auth/microsoft/callback,FRONTEND_ORIGIN=$FRONTEND_ORIGIN,DOCAI_SA_KEY_B64=$_SA_KEY_B64,GOOGLE_OAUTH_CLIENT_ID=$GOOGLE_OAUTH_CLIENT_ID,GOOGLE_OAUTH_CLIENT_SECRET=$GOOGLE_OAUTH_CLIENT_SECRET,GEMINI_MODEL=$GEMINI_MODEL"
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "main"'
+
+deploy_frontend_cloud_run:
+  image: gcr.io/google.com/cloudsdktool/cloud-sdk:slim
+  stage: deploy_frontend
+  needs:
+    - build_frontend_image
+    - deploy_backend_cloud_run
+  script:
+    - test -n "$GCP_SERVICE_KEY"
+    - test -n "$GCP_PROJECT_ID"
+    - test -n "$FRONTEND_SERVICE"
+    - test -n "$BACKEND_URL"
+    - gcloud auth activate-service-account --key-file="$GCP_SERVICE_KEY"
+    - gcloud config set project "$GCP_PROJECT_ID"
+    - >
+      gcloud run deploy "$FRONTEND_SERVICE"
+      --image "$FRONTEND_IMAGE:$CI_COMMIT_SHORT_SHA"
+      --region "$GCP_REGION"
+      --platform managed
+      --allow-unauthenticated
+      --port 8080
+      --set-env-vars "BACKEND_URL=$BACKEND_URL"
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "main"'

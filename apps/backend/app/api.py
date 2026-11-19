@@ -11,4 +11,4 @@ router = APIRouter()
 
 @router.get('/deprecated')
 async def deprecated():
-    return {"detail": "deprecated - use /auth/* endpoints"}
+    return {"detail": "deprecated - use /api/auth/* endpoints"}

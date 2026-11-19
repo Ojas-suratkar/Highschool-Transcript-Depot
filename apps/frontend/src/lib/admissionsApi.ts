@@ -18,7 +18,8 @@ import type {
 } from '@/types/admissions';
 
 const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
-
+import { listTerms } from "../lib/api/SemesterTerm";
+import { TermDTO } from '../lib/api/SemesterTerm';
 // Current user context
 const currentInstitution: Institution = {
   id: 'inst-1',
@@ -36,10 +37,8 @@ const currentUser: User = {
 };
 
 const academicTerms: AcademicTerm[] = [
-  { id: 'term-1', name: 'Fall 2025', semester: 'fall', year: 2025, isCurrent: true },
-  { id: 'term-2', name: 'Spring 2026', semester: 'spring', year: 2026, isCurrent: false },
-  { id: 'term-3', name: 'Fall 2024', semester: 'fall', year: 2024, isCurrent: false },
-];
+ { id: 'term-1', term_name: 'Fall 2025', term: 'fall', year: 2025, isCurrent: true },]
+  
 
 // Mock data
 const mockTranscripts: Transcript[] = [
@@ -47,7 +46,7 @@ const mockTranscripts: Transcript[] = [
     id: 't-1',
     student: { id: 's-1', name: 'Emily Chen', studentId: 'STU-2024-001', program: 'Computer Science', enrollmentYear: 2024 },
     institution: { id: 'mit', name: 'MIT', code: 'MIT' },
-    term: academicTerms[0],
+    term: { id: 'term-1', term_name: 'Fall 2025', term: 'fall', year: 2025, isCurrent: true },
     gpa: 3.89,
     totalCredits: 128,
     status: 'processed',
@@ -229,24 +228,51 @@ export async function getCurrentUser(): Promise<User> {
   return currentUser;
 }
 
-export async function getAcademicTerms(): Promise<AcademicTerm[]> {
-  await delay(100);
-  return academicTerms;
+export async function getAcademicTerms(institutionId: number): Promise<AcademicTerm[]> {
+ const terms = await listTerms(institutionId);
+
+  return terms.map((t: TermDTO): AcademicTerm => ({
+    id: String(t.id),  
+    term: t.term,
+    year: t.year,
+    term_name: t.term_name,
+    isCurrent: t.is_current,
+  }));
+
 }
 
 export async function getDashboardStats(): Promise<DashboardStats> {
-  await delay(300);
-  return {
-    transcriptsTotal: mockTranscripts.length,
-    transcriptsProcessed: mockTranscripts.filter(t => t.status === 'processed').length,
-    transcriptsFailed: mockTranscripts.filter(t => t.status === 'failed').length,
-    transcriptsInQueue: mockTranscripts.filter(t => t.status === 'in_queue' || t.status === 'processing').length,
-    applicationsReceived: mockApplications.length,
-    eligible: mockApplications.filter(a => a.status === 'eligible').length,
-    ineligible: mockApplications.filter(a => a.status === 'ineligible').length,
-    needsVerification: mockApplications.filter(a => a.status === 'needs_verification').length,
-    i20sGenerated: mockApplications.filter(a => a.i20Status === 'generated').length,
-  };
+  try {
+    const { apiFetch } = await import('./utils');
+    const data = await apiFetch<{
+      transcripts_total: number;
+      transcripts_completed: number;
+      transcripts_failed: number;
+      transcripts_pending: number;
+      admitted: number;
+      denied: number;
+      waitlisted: number;
+      decisions_pending: number;
+    }>('/api/admission/stats');
+    return {
+      transcriptsTotal:     data.transcripts_total,
+      transcriptsProcessed: data.transcripts_completed,
+      transcriptsFailed:    data.transcripts_failed,
+      transcriptsInQueue:   data.transcripts_pending,
+      applicationsReceived: data.admitted + data.denied + data.waitlisted + data.decisions_pending,
+      eligible:             data.admitted,
+      ineligible:           data.denied,
+      needsVerification:    data.decisions_pending,
+      i20sGenerated:        0,
+    };
+  } catch {
+    return {
+      transcriptsTotal: 0, transcriptsProcessed: 0,
+      transcriptsFailed: 0, transcriptsInQueue: 0,
+      applicationsReceived: 0, eligible: 0,
+      ineligible: 0, needsVerification: 0, i20sGenerated: 0,
+    };
+  }
 }
 
 export async function getCloudFolders(): Promise<CloudFolderSource[]> {
@@ -424,4 +450,3 @@ export async function updateInstitutionCriteria(
   await delay(500);
   return { success: true };
 }
-

@@ -12,6 +12,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
+import { formatDatePST } from '@/lib/utils';
 
 interface I20Document {
   id: string;
@@ -38,7 +39,7 @@ export default function I20List() {
     { header: 'Program', accessor: 'program' },
     {
       header: 'Generated Date',
-      accessor: (row) => new Date(row.generatedDate).toLocaleDateString(),
+      accessor: (row) => formatDatePST(row.generatedDate),
     },
     {
       header: 'Status',
@@ -106,4 +107,3 @@ export default function I20List() {
     </div>
   );
 }
-

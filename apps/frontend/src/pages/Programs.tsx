@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -22,6 +22,8 @@ import {
 import { Textarea } from '@/components/ui/textarea';
 // Removed unused icon imports; keep Plus which is used later
 import { Plus, Trash2, Save, ChevronDown, ChevronRight, CheckCircle2, AlertCircle, Info } from 'lucide-react';
+import { toast } from 'sonner';
+import { createProgramVersion } from '@/lib/api/programs';
 import type { Program } from '@/types/admissions';
 
 interface CourseRequirement {
@@ -52,40 +54,12 @@ interface AdditionalCriterion {
   isAutoVerifiable: boolean;
 }
 
-const mockPrograms: Program[] = [
-  {
-    id: '1',
-    name: 'Computer Science',
-    code: 'CS-BS',
-    degreeLevel: 'undergraduate',
-    intakeTerms: ['Fall 2025', 'Spring 2026'],
-    status: 'active',
-    applicantCount: 145,
-    requirements: {
-      id: 'req-1',
-      programId: '1',
-      rules: []
-    }
-  },
-  {
-    id: '2',
-    name: 'Business Administration',
-    code: 'BA-BS',
-    degreeLevel: 'undergraduate',
-    intakeTerms: ['Fall 2025'],
-    status: 'active',
-    applicantCount: 98,
-    requirements: {
-      id: 'req-2',
-      programId: '2',
-      rules: []
-    }
-  }
-];
+// persisted programs are loaded from backend
 
 export default function Programs() {
-  const [programs, setPrograms] = useState<Program[]>(mockPrograms);
+  const [programs, setPrograms] = useState<Program[]>([]);
   const [selectedProgram, setSelectedProgram] = useState<Program | null>(null);
+  const [creatingProgramId, setCreatingProgramId] = useState<string | null>(null);
   const [_isAddingProgram, _setIsAddingProgram] = useState(false);
   const [_isEditingProgram, _setIsEditingProgram] = useState(false);
   const [expandedSections, setExpandedSections] = useState<Record<string, boolean>>({
@@ -152,6 +126,33 @@ export default function Programs() {
       isAutoVerifiable: false
     }
   ]);
+
+  // load persisted programs from backend
+  async function loadPrograms() {
+    try {
+      const res = await (await import('@/lib/api/programs')).listPrograms();
+      // map server list into Program[] minimal shape
+      const mapped: Program[] = (res || []).map((p: any) => ({
+        id: String(p.id),
+        name: p.program_name,
+        code: '',
+        degreeLevel: 'undergraduate',
+        intakeTerms: [p.year_intake],
+        status: 'active',
+        applicantCount: 0,
+        requirements: { id: `req-${p.id}`, programId: String(p.id), rules: [] },
+        // include prereq_count for display
+        // @ts-ignore - extend Program type locally for UI
+        prereq_count: p.prereq_count || 0,
+      }));
+      setPrograms(mapped);
+    } catch (err) {
+      // ignore for now
+    }
+  }
+
+  // load on mount
+  useEffect(() => { loadPrograms(); }, []);
 
   // Dialog States
   const [showAddCourseDialog, setShowAddCourseDialog] = useState(false);
@@ -236,23 +237,75 @@ export default function Programs() {
     setAdditionalCriteria(additionalCriteria.filter(c => c.id !== id));
   };
 
-  const handleAddProgram = () => {
+  const handleAddProgram = async () => {
     if (programForm.name && programForm.code && programForm.degreeLevel) {
-      const newProgram: Program = {
-        id: Date.now().toString(),
-        name: programForm.name,
-        code: programForm.code,
-        degreeLevel: programForm.degreeLevel,
-        intakeTerms: programForm.intakeTerms || [],
-        status: 'active',
-        applicantCount: 0,
-        requirements: {
-          id: `req-${Date.now()}`,
-          programId: Date.now().toString(),
-          rules: []
+      // Try to create via backend API first
+  try {
+        const mappedPrereqs: { course_name: string; min_gpa?: string }[] = [];
+        // map course requirements into prerequisites
+        for (const c of courseRequirements) {
+          if (c.courseName) mappedPrereqs.push({ course_name: c.courseName, min_gpa: c.minimumGrade });
         }
-      };
-      setPrograms([...programs, newProgram]);
+        // map additionalCriteria 'gpa' into a GPA prerequisite
+        for (const a of additionalCriteria) {
+          if (a.type === 'gpa' && a.threshold) {
+            mappedPrereqs.push({ course_name: 'GPA', min_gpa: a.threshold });
+          }
+        }
+
+        const payload = {
+          program_name: programForm.name,
+          year_intake: (programForm.intakeTerms && programForm.intakeTerms[0]) || '2026',
+          prerequisites: mappedPrereqs,
+        };
+        // lazy import to avoid circulars during build
+  const { createProgram } = await import('@/lib/api/programs');
+        const res = await createProgram(payload as any);
+        if (res && res.ok) {
+          // append program locally with server id
+          const newProgram: Program = {
+            id: String(res.id),
+            name: programForm.name!,
+            code: programForm.code!,
+            degreeLevel: programForm.degreeLevel!,
+            intakeTerms: programForm.intakeTerms || [],
+            status: 'active',
+            applicantCount: 0,
+            requirements: {
+              id: `req-${Date.now()}`,
+              programId: String(res.id),
+              rules: []
+            }
+          };
+          // Mark as creating to show affirming animation and delay
+          setCreatingProgramId(String(res.id));
+          // small delay so UI feels deliberate (e.g., 700ms to 1200ms)
+          await new Promise((r) => setTimeout(r, 900));
+          // refresh from server to get authoritative list
+          await loadPrograms();
+          // auto-select and focus the newly created program so user can add prereqs
+          setSelectedProgram(newProgram);
+          // clear creating state after animation
+          setCreatingProgramId(null);
+          toast.success('Program created', {
+            action: {
+              label: 'View',
+              onClick: () => {
+                setSelectedProgram(newProgram);
+                // scroll into view of the prerequisites section
+                const el = document.querySelector('[data-prereqs-section]');
+                if (el) el.scrollIntoView({ behavior: 'smooth' });
+              }
+            }
+          });
+        } else {
+          // API reported failure; surface error to user
+          throw new Error('Failed to create program on server');
+        }
+      } catch (err: any) {
+        toast.error(err?.message || 'Failed to create program');
+      }
+
       setProgramForm({});
       setShowProgramDialog(false);
     }
@@ -278,7 +331,7 @@ export default function Programs() {
             key={program.id}
             className={`shadow-card cursor-pointer transition-all hover:shadow-lg ${
               selectedProgram?.id === program.id ? 'ring-2 ring-blue-500' : ''
-            }`}
+            } ${creatingProgramId === program.id ? 'opacity-80 scale-105 transition-transform duration-700' : ''}`}
             onClick={() => setSelectedProgram(program)}
           >
             <CardHeader>
@@ -287,12 +340,15 @@ export default function Programs() {
                   <CardTitle className="text-lg">{program.name}</CardTitle>
                   <CardDescription className="mt-1">{program.code}</CardDescription>
                 </div>
-                <Badge
+                <div className="flex flex-col items-end">
+                  <Badge
                   variant={program.status === 'active' ? 'default' : 'secondary'}
                   className={program.status === 'active' ? 'bg-green-500' : ''}
                 >
                   {program.status}
                 </Badge>
+                  <div className="text-xs text-muted-foreground mt-1">{(program as any).prereq_count || 0} Prerequisites</div>
+                </div>
               </div>
             </CardHeader>
             <CardContent>
@@ -330,6 +386,22 @@ export default function Programs() {
               </Button>
               <Button variant="outline" size="sm">
                 Version History
+              </Button>
+              <Button variant="ghost" size="sm" className="ml-2 px-2" onClick={async () => {
+                if (!selectedProgram) return alert('Select a program first');
+                try {
+                  const id = Number(selectedProgram.id);
+                  const res = await createProgramVersion(id, 'Saved from UI');
+                  if (res && res.ok) {
+                    alert('Saved version ' + res.id);
+                  } else {
+                    alert('Failed to save version');
+                  }
+                } catch (e: any) {
+                  alert(e?.message || 'Failed to save version');
+                }
+              }}>
+                Save new version
               </Button>
             </div>
           </div>

@@ -7,6 +7,7 @@ import { Input } from '@/components/ui/input';
 import { DataTable, ColumnDef } from '@/components/shared/DataTable';
 import { StatusBadge } from '@/components/shared/StatusBadge';
 import { listApplications } from '@/lib/admissionsApi';
+import { formatDatePST } from '@/lib/utils';
 import type { Application } from '@/types/admissions';
 
 export default function ApplicationList() {
@@ -60,7 +61,10 @@ export default function ApplicationList() {
       header: 'Status',
       accessor: (row) => <StatusBadge status={row.status} />,
     },
-    { header: 'Applied Date', accessor: (row) => new Date(row.appliedAt).toLocaleDateString() },
+    {
+      header: 'Applied Date',
+      accessor: (row) => formatDatePST(row.appliedAt),
+    },
     ...(location.pathname.includes('eligible')
       ? [
           {
@@ -144,4 +148,3 @@ export default function ApplicationList() {
     </div>
   );
 }
-

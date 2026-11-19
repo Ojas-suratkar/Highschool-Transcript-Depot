@@ -1,4 +1,3 @@
-// useState not needed in this component
 import { useParams, useNavigate } from 'react-router-dom';
 import { ArrowLeft } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -25,7 +24,59 @@ interface Course {
   matched: boolean;
 }
 
-// Mock data for transcripts
+const agRequirementRows = [
+  { requirement: 'History / Social Science (A)', actual: 6, def: '' },
+  { requirement: 'English (B)', actual: 8, def: '' },
+  { requirement: 'Mathematics (C)', actual: 10, def: '' },
+  { requirement: 'Bio (D1)', actual: 6, def: '' },
+  { requirement: 'Phys (D2)', actual: 5, def: '' },
+  { requirement: 'Laboratory Science (D) = D1 + D2', actual: 13, def: '' },
+  { requirement: 'Language Other than English (E)', actual: 8, def: '' },
+  { requirement: 'Visual & Performing Arts (F)', actual: 2, def: '' },
+  { requirement: 'College-Preparatory Elective (G)', actual: 7, def: '' },
+  { requirement: 'TOTAL', actual: 54, def: '' },
+];
+
+function AGRequirementTable() {
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle>College Preparatory Semesters</CardTitle>
+      </CardHeader>
+
+      <CardContent>
+        <div className="overflow-x-auto">
+          <table className="min-w-[650px] border-collapse text-sm">
+            <thead>
+              <tr className="bg-slate-100">
+                <th className="border px-4 py-2 text-left font-semibold">Requirement</th>
+                <th className="w-[110px] border px-4 py-2 text-center font-semibold">Actual</th>
+                <th className="w-[90px] border px-4 py-2 text-center font-semibold">DEF</th>
+              </tr>
+            </thead>
+
+            <tbody>
+              {agRequirementRows.map((row) => (
+                <tr key={row.requirement}>
+                  <td className="border px-4 py-2">{row.requirement}</td>
+                  <td className="border px-4 py-2 text-center">
+                    <input
+                      readOnly
+                      value={row.actual}
+                      className="h-7 w-14 rounded border bg-white text-center text-sm"
+                    />
+                  </td>
+                  <td className="border px-4 py-2 text-center">{row.def}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
 const mockTranscriptDetails: Record<string, any> = {
   '1': {
     studentName: 'John Smith',
@@ -43,42 +94,6 @@ const mockTranscriptDetails: Record<string, any> = {
       { id: '4', name: 'Computer Science', credits: 5, grade: 'A', term: 'Spring 2024', agGroup: 'G', matched: true },
       { id: '5', name: 'US History', credits: 5, grade: 'B', term: 'Spring 2024', agGroup: 'A', matched: true },
       { id: '6', name: 'Spanish III', credits: 5, grade: 'A', term: 'Spring 2024', agGroup: 'E', matched: true },
-    ],
-  },
-  '2': {
-    studentName: 'Sarah Johnson',
-    studentId: 'STU-2025-002',
-    school: 'Lincoln High School',
-    dob: '2006-08-22',
-    graduationDate: '2025-06-15',
-    address: '456 Oak Ave, Los Angeles, CA 90002',
-    gpa: 3.92,
-    totalCredits: 30,
-    courses: [
-      { id: '1', name: 'AP Calculus AB', credits: 5, grade: 'A', term: 'Fall 2024', agGroup: 'C', matched: true },
-      { id: '2', name: 'AP Physics', credits: 5, grade: 'A', term: 'Fall 2024', agGroup: 'D', matched: true },
-      { id: '3', name: 'English Literature', credits: 5, grade: 'A', term: 'Fall 2024', agGroup: 'B', matched: true },
-      { id: '4', name: 'Computer Science', credits: 5, grade: 'A', term: 'Spring 2024', agGroup: 'G', matched: true },
-      { id: '5', name: 'US History', credits: 5, grade: 'A-', term: 'Spring 2024', agGroup: 'A', matched: true },
-      { id: '6', name: 'Spanish III', credits: 5, grade: 'A+', term: 'Spring 2024', agGroup: 'E', matched: true },
-    ],
-  },
-  '3': {
-    studentName: 'James Wilson',
-    studentId: 'STU-2025-003',
-    school: 'Lincoln High School',
-    dob: '2006-03-10',
-    graduationDate: '2025-06-15',
-    address: '789 Pine Rd, Los Angeles, CA 90003',
-    gpa: 3.45,
-    totalCredits: 30,
-    courses: [
-      { id: '1', name: 'Calculus', credits: 5, grade: 'B+', term: 'Fall 2024', agGroup: 'C', matched: false },
-      { id: '2', name: 'Physics', credits: 5, grade: 'C+', term: 'Fall 2024', agGroup: 'D', matched: false },
-      { id: '3', name: 'English Literature', credits: 5, grade: 'B', term: 'Fall 2024', agGroup: 'B', matched: true },
-      { id: '4', name: 'Computer Science', credits: 5, grade: 'B+', term: 'Spring 2024', agGroup: 'G', matched: true },
-      { id: '5', name: 'US History', credits: 5, grade: 'B-', term: 'Spring 2024', agGroup: 'A', matched: true },
-      { id: '6', name: 'Spanish III', credits: 5, grade: 'B', term: 'Spring 2024', agGroup: 'E', matched: true },
     ],
   },
 };
@@ -116,6 +131,7 @@ export default function TranscriptDetail() {
           <TabsTrigger value="personal">Personal Data</TabsTrigger>
           <TabsTrigger value="courses">Courses</TabsTrigger>
           <TabsTrigger value="standardization">Standardization</TabsTrigger>
+          <TabsTrigger value="agRequirement">A/G Requirement</TabsTrigger>
           <TabsTrigger value="json">Raw JSON</TabsTrigger>
           <TabsTrigger value="evaluation">Evaluation Trace</TabsTrigger>
         </TabsList>
@@ -129,27 +145,27 @@ export default function TranscriptDetail() {
               <div className="grid grid-cols-2 gap-6">
                 <div>
                   <p className="text-sm text-muted-foreground">Name</p>
-                  <p className="text-lg font-semibold mt-1">{transcript.studentName}</p>
+                  <p className="mt-1 text-lg font-semibold">{transcript.studentName}</p>
                 </div>
                 <div>
                   <p className="text-sm text-muted-foreground">Date of Birth</p>
-                  <p className="text-lg font-semibold mt-1">{transcript.dob}</p>
+                  <p className="mt-1 text-lg font-semibold">{transcript.dob}</p>
                 </div>
                 <div>
                   <p className="text-sm text-muted-foreground">Student ID</p>
-                  <p className="text-lg font-semibold mt-1">{transcript.studentId}</p>
+                  <p className="mt-1 text-lg font-semibold">{transcript.studentId}</p>
                 </div>
                 <div>
                   <p className="text-sm text-muted-foreground">School</p>
-                  <p className="text-lg font-semibold mt-1">{transcript.school}</p>
+                  <p className="mt-1 text-lg font-semibold">{transcript.school}</p>
                 </div>
                 <div>
                   <p className="text-sm text-muted-foreground">Graduation Date</p>
-                  <p className="text-lg font-semibold mt-1">{transcript.graduationDate}</p>
+                  <p className="mt-1 text-lg font-semibold">{transcript.graduationDate}</p>
                 </div>
                 <div>
                   <p className="text-sm text-muted-foreground">Address</p>
-                  <p className="text-lg font-semibold mt-1">{transcript.address}</p>
+                  <p className="mt-1 text-lg font-semibold">{transcript.address}</p>
                 </div>
               </div>
             </CardContent>
@@ -160,7 +176,9 @@ export default function TranscriptDetail() {
           <Card>
             <CardHeader>
               <CardTitle>Course Records</CardTitle>
-              <p className="text-sm text-muted-foreground mt-2">{transcript.courses.length} courses on record</p>
+              <p className="mt-2 text-sm text-muted-foreground">
+                {transcript.courses.length} courses on record
+              </p>
             </CardHeader>
             <CardContent>
               <div className="overflow-x-auto">
@@ -225,13 +243,17 @@ export default function TranscriptDetail() {
           </Card>
         </TabsContent>
 
+        <TabsContent value="agRequirement">
+          <AGRequirementTable />
+        </TabsContent>
+
         <TabsContent value="json">
           <Card>
             <CardHeader>
               <CardTitle>Raw JSON Data</CardTitle>
             </CardHeader>
             <CardContent>
-              <pre className="bg-muted p-4 rounded-lg overflow-auto max-h-[600px] text-sm font-mono">
+              <pre className="max-h-[600px] overflow-auto rounded-lg bg-muted p-4 font-mono text-sm">
                 {JSON.stringify(transcript, null, 2)}
               </pre>
             </CardContent>
@@ -244,23 +266,23 @@ export default function TranscriptDetail() {
               <CardTitle>Evaluation Trace</CardTitle>
             </CardHeader>
             <CardContent className="space-y-3">
-              <div className="flex items-center gap-2 p-3 border rounded-lg">
+              <div className="flex items-center gap-2 rounded-lg border p-3">
                 <StatusBadge status="pass" />
                 <span>OCR Processing: Successful</span>
               </div>
-              <div className="flex items-center gap-2 p-3 border rounded-lg">
+              <div className="flex items-center gap-2 rounded-lg border p-3">
                 <StatusBadge status="pass" />
                 <span>GPA Extraction: 3.85 identified</span>
               </div>
-              <div className="flex items-center gap-2 p-3 border rounded-lg">
+              <div className="flex items-center gap-2 rounded-lg border p-3">
                 <StatusBadge status="pass" />
                 <span>Course Mapping: 6 courses standardized</span>
               </div>
-              <div className="flex items-center gap-2 p-3 border rounded-lg">
+              <div className="flex items-center gap-2 rounded-lg border p-3">
                 <StatusBadge status="pass" />
                 <span>UC Match Evaluation: PASS</span>
               </div>
-              <div className="flex items-center gap-2 p-3 border rounded-lg">
+              <div className="flex items-center gap-2 rounded-lg border p-3">
                 <StatusBadge status="pass" />
                 <span>A-G Requirements: Met</span>
               </div>
@@ -271,4 +293,3 @@ export default function TranscriptDetail() {
     </div>
   );
 }
-

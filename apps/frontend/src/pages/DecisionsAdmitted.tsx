@@ -1,76 +1,95 @@
 import { PageHeader } from '@/components/shared/PageHeader';
-import { DataTable, ColumnDef } from '@/components/shared/DataTable';
-import { Button } from '@/components/ui/button';
-import { Eye } from 'lucide-react';
+import { StandardTable } from '@/components/shared/StandardTable';
+import { decisionColumns, schoolOf, DecisionRow } from './decisions/decisionColumns';
+import { CheckCircle2 } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
-
-type Decision = { id: string; studentName: string; program: string; status: 'pending' | 'admitted' | 'denied' | 'waitlisted' };
-
-const STORAGE_KEY = 'admission_decisions_v1';
+import { useNavigate } from 'react-router-dom';
+import TranscriptDetailDialog, { TranscriptRecord } from '@/components/dialogs/TranscriptDetailDialog';
+import { fetchCompletedStudents } from '@/lib/api/extractor';
+import { batchCalculateAdmission } from '@/lib/api/studentAgSummary';
+import { mapStudentToTranscriptRecord } from '@/lib/studentUtils';
+import { useTerm } from '@/contexts/TermContext';
+import { useStaleData } from '@/lib/useStaleData';
 
 export default function DecisionsAdmitted() {
-  const [items, setItems] = useState<Decision[]>([]);
-  const [openId, setOpenId] = useState<string | null>(null);
-  const [active, setActive] = useState<Decision | null>(null);
+  const navigate = useNavigate();
+  const { currentTerm, terms } = useTerm();
+  const termName = terms.find((t) => t.id === currentTerm)?.term_name;
 
+  const [refreshKey, setRefreshKey] = useState(0);
+
+  const { data: rawStudents, refreshing } = useStaleData(
+    `completed:${termName ?? ''}:${refreshKey}`,
+    () => fetchCompletedStudents(termName, true),
+    [termName, refreshKey],
+    { refreshIntervalMs: 8000 },
+  );
+
+  // Auto-route: compute decisions so admitted students appear right after extraction.
   useEffect(() => {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    let all: Decision[] = [];
-    if (raw) {
-      try {
-        all = JSON.parse(raw) as Decision[];
-      } catch (e) {
-        all = [];
-      }
-    }
-    setItems(all);
-  }, []);
+    if (!termName) return;
+    batchCalculateAdmission(termName)
+      .then(({ processed }) => {
+        if (processed > 0) setRefreshKey((k) => k + 1);
+      })
+      .catch(() => {});
+  }, [termName]);
 
-  const admitted = useMemo(() => items.filter((i) => i.status === 'admitted'), [items]);
+  const [openId, setOpenId] = useState<string | null>(null);
+  const [active, setActive] = useState<TranscriptRecord | null>(null);
 
-  const columns: ColumnDef<Decision>[] = [
-    { header: 'Student Name', accessor: 'studentName' },
-    { header: 'Program', accessor: 'program' },
-  // Status column removed per request
-    {
-      header: 'Actions',
-      accessor: (r) => r.id,
-      cell: (_, row: Decision) => (
-        <div className="flex items-center gap-2">
-          <Button variant="ghost" onClick={() => { setActive(row); setOpenId(row.id); }}>
-            <Eye className="h-4 w-4" />
-          </Button>
-          <Button variant="ghost">Generate I-20</Button>
-          <Button variant="ghost">Download</Button>
-        </div>
-      ),
-    },
-  ];
+  const admitted = useMemo<DecisionRow[]>(() => {
+    if (!rawStudents) return [];
+    return rawStudents
+      .filter((s) => s.admission_decision === 'admitted')
+      .map((s, idx) => ({ ...mapStudentToTranscriptRecord(s, 'completed'), school: schoolOf(s), serial: idx + 1 }));
+  }, [rawStudents]);
+
+  const columns = useMemo(
+    () =>
+      decisionColumns((r) => {
+        setActive(r);
+        setOpenId(r.id);
+      }),
+    [],
+  );
 
   return (
     <div className="space-y-6">
-      <PageHeader title="Admitted" subtitle="Students who have been accepted" />
-      <DataTable columns={columns} data={admitted} keyExtractor={(r) => r.id} />
+      <PageHeader
+        title="Admitted"
+        icon={CheckCircle2}
+        iconColor="text-emerald-600"
+        subtitle="Students who meet the admission criteria"
+        tone="success"
+      />
+      {refreshing && admitted.length === 0 ? (
+        <div className="rounded-md border p-4 text-sm text-muted-foreground">Loading…</div>
+      ) : (
+        <StandardTable
+          columns={columns}
+          data={admitted}
+          rowKey={(r) => r.id}
+          flagId={(r) => r.id}
+          search
+          searchPlaceholder="Search students, schools…"
+          storageKey="decisions:admitted"
+          emptyMessage="No admitted students yet."
+        />
+      )}
 
-      <Dialog open={!!openId} onOpenChange={() => setOpenId(null)}>
-        <DialogContent className="!w-[700px] !max-w-[95%]">
-          <DialogHeader>
-            <DialogTitle>{active?.studentName}</DialogTitle>
-          </DialogHeader>
-          <div className="p-4">
-            <div className="text-sm text-muted-foreground">Student ID</div>
-            <div className="font-medium mb-3">{active?.id}</div>
-            <div className="text-sm text-muted-foreground">Program</div>
-            <div className="font-medium mb-3">{active?.program}</div>
-            <div className="text-sm text-muted-foreground">Status</div>
-            <div className="font-medium text-green-700">Admitted</div>
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setOpenId(null)}>Close</Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      <TranscriptDetailDialog
+        open={!!openId}
+        onOpenChange={(open) => {
+          if (!open) setOpenId(null);
+        }}
+        transcript={active}
+        onDecisionSaved={(decision) => {
+          setOpenId(null);
+          setRefreshKey((k) => k + 1);
+          if (decision !== 'admitted') navigate(`/app/decisions/${decision}`);
+        }}
+      />
     </div>
   );
 }

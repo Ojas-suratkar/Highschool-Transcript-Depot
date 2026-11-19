@@ -2,30 +2,70 @@ import { PageHeader } from '@/components/shared/PageHeader';
 import { DataTable, ColumnDef } from '@/components/shared/DataTable';
 import { Button } from '@/components/ui/button';
 import { Eye } from 'lucide-react';
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
+import { useTerm } from '@/contexts/TermContext';
 import PdfPreviewDialog from '@/components/dialogs/PdfPreviewDialog';
+import { useStaleData } from '@/lib/useStaleData';
 
-type Row = { id: string; format: string; count: number };
+type IncomingFile = {
+  id: string;
+  serial: number;
+  name: string;
+  blob_name: string;
+};
 
-const data: Row[] = [
-  { id: 'f1', format: 'Lincoln High School', count: 320 },
-  { id: 'f2', format: 'Roosevelt District', count: 240 },
-  { id: 'f3', format: 'Jefferson Academy', count: 180 },
-  { id: 'f4', format: 'West County HS', count: 120 },
-  { id: 'f5', format: 'Other Formats', count: 140 },
-];
+type IncomingGroup = {
+  semester: string;
+  count: number;
+  files: { id: string; name: string; file_name: string; blob_name: string }[];
+};
+
+function mapGroupsToRows(groups: IncomingGroup[]): IncomingFile[] {
+  return groups
+    .flatMap((g) => g.files)
+    .map((f, i) => ({ id: f.id, serial: i + 1, name: f.name, blob_name: f.blob_name }));
+}
 
 export default function DetectorIncoming() {
-  const [preview, setPreview] = useState<{ open: boolean; label?: string }>({ open: false });
+  const { currentTerm, terms } = useTerm();
+  const termName = terms.find((t) => t.id === currentTerm)?.term_name;
 
-  const columns: ColumnDef<Row>[] = [
-    { header: 'Transcript Format', accessor: 'format' },
-    { header: 'Quantity', accessor: 'count' },
+  const [preview, setPreview] = useState<{ open: boolean; url?: string; title?: string }>({ open: false });
+
+  const { data: rawGroups, refreshing } = useStaleData<IncomingGroup[]>(
+    `detector-incoming:${termName ?? ''}`,
+    async () => {
+      if (!termName) return [];
+      const res = await fetch(
+        `/api/transcript-detector/incoming?semester=${encodeURIComponent(termName)}`
+      );
+      if (!res.ok) throw new Error('Failed to load');
+      return res.json() as Promise<IncomingGroup[]>;
+    },
+    [termName],
+  );
+
+  const rows = useMemo(() => {
+    if (!rawGroups) return [];
+    return mapGroupsToRows(rawGroups);
+  }, [rawGroups]);
+
+  const openFile = (blobName: string, fileName: string) => {
+    setPreview({
+      open: true,
+      url: `/api/transcript-detector/incoming/file?blob_name=${encodeURIComponent(blobName)}`,
+      title: fileName,
+    });
+  };
+
+  const columns: ColumnDef<IncomingFile>[] = [
+    { header: 'S.No', accessor: 'serial', className: 'font-normal' },
+    { header: 'File Name', accessor: 'name' },
     {
-      header: 'View',
+      header: 'Actions',
       accessor: (r) => (r as unknown) as React.ReactNode,
-      cell: (_, row: Row) => (
-        <Button variant="ghost" onClick={() => setPreview({ open: true, label: `Format: ${row.format} (id: ${row.id})` })}>
+      cell: (_, row: IncomingFile) => (
+        <Button variant="ghost" onClick={() => openFile(row.blob_name, row.name)}>
           <Eye className="h-4 w-4" />
         </Button>
       ),
@@ -34,9 +74,34 @@ export default function DetectorIncoming() {
 
   return (
     <div className="space-y-6">
-      <PageHeader title="Incoming Transcripts" subtitle="Summary of all transcript formats currently arriving (count: 1000)" />
-  <DataTable columns={columns} data={data} keyExtractor={(r) => r.id} />
-  <PdfPreviewDialog open={preview.open} onOpenChange={(o) => setPreview({ open: o })} idLabel={preview.label} />
+      <PageHeader
+        title="Incoming Transcripts"
+        subtitle={
+          refreshing
+            ? 'Loading…'
+            : termName
+              ? `${termName} · ${rows.length} file${rows.length !== 1 ? 's' : ''} awaiting processing`
+              : 'Select a term from the top-right to view files'
+        }
+      />
+
+      {!termName ? null : refreshing && rows.length === 0 ? (
+        <div className="rounded-md border p-4 text-sm text-muted-foreground">Loading incoming transcripts…</div>
+      ) : (
+        <DataTable
+          columns={columns}
+          data={rows}
+          keyExtractor={(r) => r.id}
+          emptyMessage="No incoming transcripts for this term."
+        />
+      )}
+
+      <PdfPreviewDialog
+        open={preview.open}
+        onOpenChange={(open) => setPreview((p) => ({ ...p, open }))}
+        title={preview.title}
+        url={preview.url}
+      />
     </div>
   );
 }

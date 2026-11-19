@@ -7,6 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { StatusBadge } from '@/components/shared/StatusBadge';
 import { getApplication } from '@/lib/admissionsApi';
 import type { Application } from '@/types/admissions';
+import { formatDatePST } from '@/lib/utils';
 
 export default function ApplicationDetail() {
   const { applicationId } = useParams();
@@ -80,7 +81,9 @@ export default function ApplicationDetail() {
                 </div>
                 <div>
                   <p className="text-sm text-muted-foreground">Applied Date</p>
-                  <p className="font-medium">{new Date(application.appliedAt).toLocaleDateString()}</p>
+                  <p className="font-medium">
+                    {formatDatePST(application.appliedAt)}
+                  </p>
                 </div>
                 <div>
                   <p className="text-sm text-muted-foreground">Status</p>
@@ -167,4 +170,3 @@ export default function ApplicationDetail() {
     </div>
   );
 }
-

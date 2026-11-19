@@ -13,29 +13,21 @@ const ThemeContext = createContext<ThemeContextValue | undefined>(undefined);
 const STORAGE_KEY = 'app_theme_v1';
 
 export function ThemeProvider({ children }: { children: ReactNode }) {
-  const [theme, setThemeState] = useState<Theme>('light');
+  // Dark mode has been removed — the app is always light. Keep the provider so
+  // any remaining consumers of useTheme() still work, but never apply `.dark`.
+  const [theme] = useState<Theme>('light');
 
   useEffect(() => {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    if (raw === 'dark' || raw === 'light') {
-      setThemeState(raw as Theme);
-    } else {
-      // default to light
-      setThemeState('light');
+    document.documentElement.classList.remove('dark');
+    try {
+      localStorage.removeItem(STORAGE_KEY);
+    } catch {
+      /* ignore */
     }
   }, []);
 
-  useEffect(() => {
-    if (theme === 'dark') {
-      document.documentElement.classList.add('dark');
-    } else {
-      document.documentElement.classList.remove('dark');
-    }
-    localStorage.setItem(STORAGE_KEY, theme);
-  }, [theme]);
-
-  const toggleTheme = () => setThemeState((t) => (t === 'dark' ? 'light' : 'dark'));
-  const setTheme = (t: Theme) => setThemeState(t);
+  const toggleTheme = () => {};
+  const setTheme = (_t: Theme) => {};
 
   return <ThemeContext.Provider value={{ theme, toggleTheme, setTheme }}>{children}</ThemeContext.Provider>;
 }

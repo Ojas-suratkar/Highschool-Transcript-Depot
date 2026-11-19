@@ -1,0 +1,107 @@
+/* ============================================================================
+   Depot design system — ported from the approved artifact (depot-v3).
+   Tokens drive the whole app; shell classes are prefixed `dpt-` so they never
+   collide with existing app or shadcn styles. Dark mode keys off the app's
+   `.dark` class on <html> (see ThemeContext).
+   ========================================================================== */
+:root {
+  --blue: #2563eb; --green: #059669; --violet: #7c3aed; --amber: #d97706;
+  --blue-t: #eff5ff; --green-t: #ecfdf5; --violet-t: #f5f3ff; --amber-t: #fffbeb;
+  --ok: #059669; --ok-t: #ecfdf5; --warn: #b45309; --warn-t: #fffbeb;
+  --danger: #dc2626; --danger-t: #fef2f2; --info: #2563eb; --info-t: #eff5ff;
+  --dbg: #f1f5f9; --panel: #ffffff; --panel-2: #f8fafc; --panel-3: #f1f5f9; --dsidebar: #ffffff;
+  --ink: #0f172a; --ink-2: #475569; --ink-3: #94a3b8; --ink-4: #cbd5e1;
+  --dline: #e2e8f0; --line-2: #eef2f7;
+  --accent: var(--blue);
+  --sh-sm: 0 1px 2px rgba(15,23,42,.06);
+  --sh: 0 1px 3px rgba(15,23,42,.07), 0 6px 16px -10px rgba(15,23,42,.15);
+  --sh-pop: 0 12px 40px -8px rgba(15,23,42,.28);
+  --dr: 12px; --dr-sm: 8px;
+}
+html.dark {
+  --blue-t: #172554; --green-t: #052e21; --violet-t: #1e163a; --amber-t: #2c1e08;
+  --ok-t: #052e21; --warn-t: #2c1e08; --danger-t: #2f1414; --info-t: #172554;
+  --dbg: #0a0f1a; --panel: #0f172a; --panel-2: #0d1424; --panel-3: #131c30; --dsidebar: #0d1220;
+  --ink: #e2e8f0; --ink-2: #94a3b8; --ink-3: #64748b; --ink-4: #3f4c60;
+  --dline: #1e293b; --line-2: #17222f;
+  --sh-sm: 0 1px 2px rgba(0,0,0,.4);
+  --sh: 0 1px 3px rgba(0,0,0,.4), 0 8px 20px -12px rgba(0,0,0,.6);
+  --sh-pop: 0 14px 44px -8px rgba(0,0,0,.7);
+}
+
+/* Page canvas ------------------------------------------------------------- */
+.dpt-bg { background: var(--dbg); color: var(--ink); }
+
+/* Sidebar ----------------------------------------------------------------- */
+.dpt-side { background: var(--dsidebar); display: flex; flex-direction: column; height: 100%; }
+.dpt-brand { display: flex; align-items: center; gap: 11px; padding: 15px 14px; border-bottom: 1px solid var(--line-2); }
+.dpt-mk { width: 34px; height: 34px; border-radius: 9px; background: linear-gradient(135deg, var(--blue), #4f46e5); display: grid; place-items: center; color: #fff; flex: 0 0 auto; }
+.dpt-brand b { font-size: 14px; letter-spacing: -.2px; display: block; line-height: 1.15; color: var(--ink); }
+.dpt-brand small { font-size: 11px; color: var(--ink-3); }
+
+.dpt-nav { padding: 8px 10px 16px; display: flex; flex-direction: column; gap: 1px; overflow-y: auto; flex: 1; }
+.dpt-sec { font-size: 10px; letter-spacing: .1em; text-transform: uppercase; color: var(--ink-3); padding: 13px 10px 5px; font-weight: 700; }
+.dpt-navitem { display: flex; align-items: center; gap: 10px; padding: 8px 10px; border-radius: 7px; color: var(--ink-2); font-weight: 500; position: relative; font-size: 13px; width: 100%; text-align: left; background: transparent; border: 0; }
+.dpt-navitem:hover { background: var(--panel-2); color: var(--ink); }
+.dpt-navitem.active { background: var(--blue-t); color: var(--blue); font-weight: 600; }
+.dpt-navitem.active::before { content: ""; position: absolute; left: -10px; top: 6px; bottom: 6px; width: 3px; border-radius: 0 3px 3px 0; background: var(--blue); }
+.dpt-navitem .dpt-ic { color: var(--ink-3); flex: 0 0 auto; }
+.dpt-navitem:hover .dpt-ic, .dpt-navitem.active .dpt-ic { color: currentColor; }
+.dpt-navitem .dpt-cnt { margin-left: auto; font-size: 11px; background: var(--panel-3); color: var(--ink-2); border-radius: 20px; padding: 0 7px; font-weight: 600; min-width: 20px; text-align: center; }
+.dpt-navitem.active .dpt-cnt { background: rgba(255,255,255,.6); color: var(--blue); }
+.dpt-navitem.warn .dpt-cnt { background: var(--warn-t); color: var(--warn); }
+.dpt-subnav { display: none; flex-direction: column; gap: 1px; }
+.dpt-navgroup.open .dpt-subnav { display: flex; }
+.dpt-subnav .dpt-navitem { padding: 6px 10px 6px 16px; font-size: 12.5px; }
+.dpt-subnav .dpt-navitem.has-ic { padding-left: 16px; }
+.dpt-subnav .dpt-navitem.has-step { padding-left: 12px; }
+.dpt-subnav .dpt-navitem.active::before { display: none; }
+.dpt-chev { margin-left: auto; transition: transform .18s; color: var(--ink-4); }
+.dpt-navgroup.open .dpt-chev { transform: rotate(90deg); }
+
+/* Section headers read as headings — a hair heavier and darker than their
+   children, not heavy. Children sit under a guide line for hierarchy. */
+.dpt-navgroup > .dpt-navitem { font-weight: 600; font-size: 13px; color: var(--ink); }
+.dpt-navgroup > .dpt-navitem .dpt-ic { color: var(--ink-2); }
+.dpt-navgroup > .dpt-subnav { border-left: 1px solid var(--line-2); margin: 2px 0 6px 19px; }
+/* Numbered workflow steps (Upload → Classify → Extract). */
+.dpt-step { display: grid; place-items: center; width: 19px; height: 19px; border-radius: 50%; color: #fff; font-size: 10.5px; font-weight: 800; flex: 0 0 auto; box-shadow: 0 1px 2px rgba(0,0,0,.18); }
+
+.dpt-foot { margin-top: auto; padding: 12px; border-top: 1px solid var(--line-2); }
+.dpt-foot .u { display: flex; align-items: center; gap: 10px; padding: 6px; border-radius: 8px; }
+.dpt-foot .u:hover { background: var(--panel-2); }
+.dpt-foot .u b { font-size: 12.5px; display: block; line-height: 1.2; color: var(--ink); }
+.dpt-foot .u span { font-size: 11px; color: var(--ink-3); }
+
+.dpt-avatar { border-radius: 50%; display: grid; place-items: center; color: #fff; font-weight: 700; flex: 0 0 auto; }
+
+/* Top bar ----------------------------------------------------------------- */
+.dpt-top { position: sticky; top: 0; z-index: 30; background: var(--panel); border-bottom: 1px solid var(--dline); display: flex; align-items: center; gap: 12px; padding: 10px 20px; min-height: 56px; }
+.dpt-top .hd h1 { font-size: 15px; letter-spacing: -.2px; line-height: 1.2; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: var(--ink); font-weight: 700; }
+.dpt-top .hd span { font-size: 12px; color: var(--ink-3); }
+.dpt-gsearch { display: flex; align-items: center; gap: 9px; height: 36px; padding: 0 12px; border: 1px solid var(--dline); background: var(--panel-2); border-radius: 8px; width: 300px; max-width: 30vw; color: var(--ink-3); }
+.dpt-gsearch input { border: 0; background: transparent; outline: none; font: inherit; color: var(--ink); flex: 1; }
+.dpt-gsearch kbd { font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace; font-size: 10.5px; border: 1px solid var(--dline); border-radius: 5px; padding: 1px 5px; color: var(--ink-3); background: var(--panel); }
+.dpt-tsel { display: inline-flex; align-items: center; gap: 7px; height: 36px; padding: 0 8px 0 11px; border: 1px solid var(--dline); background: var(--panel); border-radius: 8px; font-weight: 600; font-size: 12.5px; color: var(--ink); }
+.dpt-tsel .add { border-left: 1px solid var(--dline); padding-left: 7px; margin-left: 2px; color: var(--blue); display: grid; place-items: center; background: transparent; border-top: 0; border-right: 0; border-bottom: 0; }
+.dpt-iconbtn { width: 36px; height: 36px; border-radius: 8px; border: 1px solid var(--dline); background: var(--panel); display: grid; place-items: center; position: relative; color: var(--ink-2); }
+.dpt-iconbtn:hover { color: var(--ink); background: var(--panel-2); }
+.dpt-dot { position: absolute; top: -5px; right: -5px; background: var(--danger); color: #fff; font-size: 9.5px; font-weight: 700; border-radius: 20px; min-width: 16px; height: 16px; display: grid; place-items: center; padding: 0 4px; border: 2px solid var(--panel); }
+
+/* Level chips ------------------------------------------------------------- */
+.dpt-lvl { font-size: 10.5px; font-weight: 700; letter-spacing: .04em; padding: 3px 9px; border-radius: 6px; text-transform: uppercase; border: 1px solid transparent; white-space: nowrap; }
+.dpt-lvl-Bronze { background: #fdf0e1; color: #9a6415; border-color: #f2dcc0; }
+.dpt-lvl-Silver { background: #eef2f7; color: #475569; border-color: #dde5ee; }
+.dpt-lvl-Gold { background: #fef6d9; color: #8a6612; border-color: #f2e3a8; }
+.dpt-lvl-Platinum { background: #eceafb; color: #5b3fb0; border-color: #ddd6f5; }
+.dpt-lvl-Admin { background: var(--blue-t); color: var(--blue); border-color: transparent; }
+
+/* Chips (status) ---------------------------------------------------------- */
+.dpt-chip { display: inline-flex; align-items: center; gap: 6px; padding: 2px 9px; border-radius: 6px; font-size: 11.5px; font-weight: 600; white-space: nowrap; border: 1px solid transparent; }
+.dpt-chip.ok { background: var(--ok-t); color: var(--ok); }
+.dpt-chip.warn { background: var(--warn-t); color: var(--warn); }
+.dpt-chip.danger { background: var(--danger-t); color: var(--danger); }
+.dpt-chip.blue { background: var(--blue-t); color: var(--blue); }
+.dpt-chip.violet { background: var(--violet-t); color: var(--violet); }
+.dpt-chip.amber { background: var(--amber-t); color: var(--amber); }
+.dpt-chip.gray { background: var(--panel-3); color: var(--ink-2); }

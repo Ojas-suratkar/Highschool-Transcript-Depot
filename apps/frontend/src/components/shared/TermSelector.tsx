@@ -34,7 +34,7 @@ export function TermSelector({ value, onValueChange, label = 'Term', showAddButt
           <SelectContent>
             {terms.map((term) => (
               <SelectItem key={term.id} value={term.id}>
-                {term.name}
+                {term.term_name}
               </SelectItem>
             ))}
           </SelectContent>

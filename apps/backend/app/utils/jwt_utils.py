@@ -4,7 +4,8 @@ from jose import jwt
 
 JWT_SECRET = os.environ.get('JWT_SECRET', 'change-me')
 JWT_ALGORITHM = os.environ.get('JWT_ALGORITHM', 'HS256')
-JWT_EXP_SECONDS = int(os.environ.get('JWT_EXP', '3600'))
+# Session lifetime: default 12 hours (was 2h, which logged people out mid-work).
+JWT_EXP_SECONDS = int(os.environ.get('JWT_EXP', '43200'))
 
 
 def create_access_token(subject: str, extra: dict = None):

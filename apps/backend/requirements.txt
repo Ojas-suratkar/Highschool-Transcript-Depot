@@ -1,10 +1,11 @@
 fastapi==0.101.1
 uvicorn[standard]==0.24.0
 SQLAlchemy>=2.0.36
+greenlet==3.1.1  # required by SQLAlchemy async (sqlalchemy.ext.asyncio); no longer auto-installed on 2.0.36+/py3.11-slim
 psycopg[binary]==3.2.13
 asyncpg==0.30.0
 aiohttp==3.9.4
-alembic==1.14.0
+alembic
 python-dotenv==1.0.0
 passlib[bcrypt]==1.7.4
 email-validator==2.0.0
@@ -19,3 +20,20 @@ redis==3.5.3
 pytest==7.4.0
 httpx==0.24.1
 mailersend>=1.2.0
+google-cloud-documentai==2.25.0
+google-cloud-storage==2.16.0
+google-api-core==2.19.0
+google-auth==2.29.0
+google-auth-oauthlib==1.2.0
+grpcio==1.62.2
+grpcio-status==1.62.2
+protobuf==4.25.3
+numpy==1.26.4
+scikit-learn==1.5.0
+google-genai
+python-multipart
+pypdfium2==4.30.0
+pymupdf==1.24.14
+Pillow==10.4.0
+fpdf2==2.8.7
+json-repair==0.61.4

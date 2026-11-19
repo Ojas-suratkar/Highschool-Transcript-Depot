@@ -2,7 +2,17 @@
 
 A full-stack web application for managing high school transcripts with automated extraction, verification, and admissions workflows.
 
-> Screenshots below use sample data only. No real student records are shown.
+
+
+## Watch the product tour
+
+[![Transcript Hub product tour](docs/transcript-hub-demo.jpg)](docs/transcript-hub-demo.mp4)
+
+A 90-second walkthrough of the running app: upload, AI extraction, human review next to the source PDF, admission rules, decisions, enrollment targets, yield and format onboarding. All students, schools and transcripts in the video are fictional. ([download the mp4](docs/transcript-hub-demo.mp4))
+
+## Screenshots
+
+> Screenshots use sample data only. No real student records are shown.
 
 <table>
   <tr>
@@ -210,3 +220,38 @@ This is a private project. For questions or issues, contact the development team
 ## 📄 License
 
 Proprietary - All rights reserved
+
+
+
+
+
+  
+## To deploy in cloud run
+  - Create docker image of frontend and backend and redeploy taerraform of cloud run to. pick new images.
+
+## BACKEND CMND
+docker buildx build --no-cache --platform linux/amd64 \
+-t us-west2-docker.pkg.dev/doc-ai-transcript/transcript-depot/transcript-backend:3 \
+--push \
+./apps/backend
+
+## Frontend CMND
+docker buildx build --no-cache --platform linux/amd64 \
+-t us-west2-docker.pkg.dev/doc-ai-transcript/transcript-depot/transcript-frontend:3 \
+--push \
+./apps/frontend
+
+
+
+
+1. run uc doorway script to extarct data from ucdoorway
+2. data is stored in sqllite db move it to our Cloud db - we have cmnds for it added in readme
+3. course code, abbrevations are separated with | so run migrate.py to insert local code. abbrev record separtely
+
+
+
+
+
+
+
+

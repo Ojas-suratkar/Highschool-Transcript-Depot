@@ -7,7 +7,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from datetime import datetime
 import os
 
-router = APIRouter(prefix='/auth')
+router = APIRouter(prefix='/api/auth')
 
 
 class RequestOTPRequest(BaseModel):

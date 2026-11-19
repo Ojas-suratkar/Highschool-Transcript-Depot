@@ -35,6 +35,7 @@ class AuthService:
         self.otp_ttl = int(settings.OTP_TTL_SECONDS)
         self.resend_cooldown = int(settings.OTP_RESEND_COOLDOWN_SECONDS)
         self.max_attempts = int(settings.OTP_MAX_ATTEMPTS)
+        self.return_debug_otp = bool(getattr(settings, "OTP_DEBUG_RETURN_IN_RESPONSE", False))
 
         dm = getattr(settings, "DELIVERY_MODE", "").lower()
         if dm == "mock" or (
@@ -98,10 +99,8 @@ class AuthService:
         return dt.astimezone(datetime.timezone.utc)
 
     def _cooldown_ok(self, last_sent_at: Optional[datetime.datetime], now: datetime.datetime) -> bool:
-        if not last_sent_at:
-            return True
-        last_sent_at = self._ensure_aware_utc(last_sent_at)
-        return (now - last_sent_at).total_seconds() >= float(self.resend_cooldown or 0)
+        # Cooldown disabled: always allow sending another OTP immediately.
+        return True
 
     async def _send_code_email(self, email: str, code: str, subject: str) -> None:
         # Keep consistent body and always mention TTL in minutes
@@ -111,6 +110,12 @@ class AuthService:
             f" It expires in {ttl_min} minute(s).</p>"
         )
         await self.sender.send(email, subject, body)
+
+    def _otp_response(self, challenge_id: str, code: str) -> dict:
+        payload = {"ok": True, "challenge_id": challenge_id, "expires_in_seconds": self.otp_ttl}
+        if self.return_debug_otp:
+            payload["debug_otp"] = code
+        return payload
 
     # ---------------------------
     # Public API
@@ -169,7 +174,7 @@ class AuthService:
             except Exception:
                 pass
 
-            return {"ok": True, "challenge_id": str(old_ch.id), "expires_in_seconds": self.otp_ttl}
+            return self._otp_response(str(old_ch.id), code)
 
         # New challenge
         code = self._make_code()
@@ -200,7 +205,7 @@ class AuthService:
             # non-fatal for signup flow; user can retry
             pass
 
-        return {"ok": True, "challenge_id": str(ch.id), "expires_in_seconds": self.otp_ttl}
+        return self._otp_response(str(ch.id), code)
 
     async def request_otp(self, email: str) -> dict:
         q = select(Profile).where(func.lower(Profile.email) == email.lower())
@@ -237,7 +242,7 @@ class AuthService:
             pass
 
         # IMPORTANT: This "challenge_id" is actually the Profile id in this flow.
-        return {"ok": True, "challenge_id": str(user.id), "expires_in_seconds": self.otp_ttl}
+        return self._otp_response(str(user.id), code)
 
     async def login_and_request_otp(self, email: str, password: str) -> dict:
         q = select(Profile).where(func.lower(Profile.email) == email.lower())
@@ -274,7 +279,7 @@ class AuthService:
         except Exception:
             pass
 
-        return {"ok": True, "challenge_id": str(user.id), "expires_in_seconds": self.otp_ttl}
+        return self._otp_response(str(user.id), code)
 
     async def verify_otp(self, challenge_id: str, otp: str) -> Tuple[bool, Optional[str]]:
         """
@@ -328,45 +333,60 @@ class AuthService:
                 await self.session.commit()
                 # return primitive id to avoid ORM attribute access outside session
                 return True, str(existing.id)
+            # Institution is MANDATORY - reject if not provided
+            if not ch_institution_name or not ch_institution_name.strip():
+                # Delete the challenge and return error
+                await self.session.delete(ch)
+                await self.session.commit()
+                return False, None
+
             # Find or create institution using ORM
-            institution_id = None
-            if ch_institution_name:
-                from ..models import Institution  # local import to avoid cycles
+            from ..models import Institution  # local import to avoid cycles
 
-                # Try to find existing institution (case-insensitive name; exact city/zip)
-                q_inst = select(Institution).where(
-                    func.lower(Institution.institution_name) == func.lower(ch_institution_name or ''),
-                    func.coalesce(Institution.city, '') == func.coalesce(ch_city or '' , ''),
-                    func.coalesce(Institution.zip_code, '') == func.coalesce(ch_zip or '' , ''),
+            # Try to find existing institution (case-insensitive name; exact city/zip)
+            q_inst = select(Institution).where(
+                func.lower(Institution.institution_name) == func.lower(ch_institution_name.strip()),
+                func.coalesce(Institution.city, '') == func.coalesce((ch_city or '').strip(), ''),
+                func.coalesce(Institution.zip_code, '') == func.coalesce((ch_zip or '').strip(), ''),
+            )
+            res_inst = await self.session.execute(q_inst)
+            inst = res_inst.scalars().first()
+
+            if inst:
+                institution_id = inst.id
+            else:
+                # Create new institution
+                new_inst = Institution(
+                    institution_name=ch_institution_name.strip(),
+                    city=(ch_city or '').strip() if ch_city else None,
+                    zip_code=(ch_zip or '').strip() if ch_zip else None
                 )
-                res_inst = await self.session.execute(q_inst)
-                inst = res_inst.scalars().first()
-                if inst:
-                    institution_id = inst.id
-                else:
-                    new_inst = Institution(institution_name=ch_institution_name or '', city=ch_city or '', zip_code=ch_zip or '')
-                    self.session.add(new_inst)
-                    # flush to get id
-                    try:
-                        await self.session.flush()
-                    except IntegrityError:
-                        await self.session.rollback()
-                        # try to fetch again in case of race
-                        res_inst2 = await self.session.execute(q_inst)
-                        inst2 = res_inst2.scalars().first()
-                        if inst2:
-                            institution_id = inst2.id
-                        else:
-                            institution_id = None
+                self.session.add(new_inst)
+                # flush to get id
+                try:
+                    await self.session.flush()
+                except IntegrityError:
+                    await self.session.rollback()
+                    # try to fetch again in case of race
+                    res_inst2 = await self.session.execute(q_inst)
+                    inst2 = res_inst2.scalars().first()
+                    if inst2:
+                        institution_id = inst2.id
                     else:
-                        institution_id = new_inst.id
+                        # Failed to create institution - reject signup
+                        await self.session.delete(ch)
+                        await self.session.commit()
+                        return False, None
+                else:
+                    institution_id = new_inst.id
 
-                profile = Profile(
+            # Create profile with mandatory institution_id
+            profile = Profile(
                 email=ch_email,
                 phone=ch_phone or "",
                 first_name=ch_first_name,
                 last_name=ch_last_name,
-                institution_id=institution_id,
+                institution_id=institution_id,  # Always set (mandatory)
                 role=ch_role,
                 password_hash=ch_password_hash,
                 is_verified=True,

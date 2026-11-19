@@ -120,7 +120,7 @@ cd apps/backend
 
 ```env
 # Database (Cloud SQL via proxy on localhost:5432)
-DATABASE_URL=postgresql+asyncpg://admin_user:Transcript123!@127.0.0.1:5432/transcripts
+DATABASE_URL=postgresql+asyncpg://postgres:postgres@127.0.0.1:5432/transcripts
 
 # App secrets
 SECRET_KEY=change-me

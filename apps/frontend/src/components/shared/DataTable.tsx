@@ -22,6 +22,10 @@ interface DataTableProps<T> {
   keyExtractor: (row: T) => string;
   emptyMessage?: string;
   title?: string;
+  /** Allow cells to wrap so the table fits the screen width (no horizontal scroll). */
+  fitWidth?: boolean;
+  /** Reduce row height (smaller cell padding / header). */
+  dense?: boolean;
 }
 
 export function DataTable<T>({
@@ -30,6 +34,8 @@ export function DataTable<T>({
   keyExtractor,
   emptyMessage = 'No data available',
   title,
+  fitWidth,
+  dense,
 }: DataTableProps<T>) {
   const getCellValue = (row: T, column: ColumnDef<T>) => {
     if (typeof column.accessor === 'function') {
@@ -37,6 +43,16 @@ export function DataTable<T>({
     }
     return row[column.accessor];
   };
+
+  const tableClassName = [
+    'w-full',
+    fitWidth
+      ? '[&_th]:whitespace-normal [&_td]:whitespace-normal [&_td]:break-words'
+      : '',
+    dense ? '[&_th]:h-8 [&_td]:py-1' : '',
+  ]
+    .filter(Boolean)
+    .join(' ');
 
   return (
     <Card>
@@ -47,7 +63,7 @@ export function DataTable<T>({
       )}
       <CardContent className={title ? '' : 'p-0'}>
         <div className="rounded-md border">
-          <Table>
+          <Table className={tableClassName}>
             <TableHeader>
               <TableRow>
                 {columns.map((column, index) => (

@@ -1,11 +1,22 @@
-project_id = "your-gcp-project-id"
+# Copy to terraform.tfvars and fill in. Never commit the real file.
+project_id = "your-gcp-project"
 region     = "us-west2"
 
 instance_name = "student-transcripts"
 db_name       = "transcripts"
-db_user       = "admin_user"
+db_user       = "app_user"
+db_password   = "set-me"
 
-db_password = "your-secure-password-here"  
 enable_public_ip = true
 authorized_cidrs = []
+ar_repo_name     = "transcript-hub"
 
+database_url                      = "postgresql+asyncpg://app_user:set-me@/transcripts?host=/cloudsql/PROJECT:REGION:INSTANCE"
+cloudsql_instance_connection_name = "PROJECT:REGION:INSTANCE"
+
+jwt_secret = "set-me"
+image_tag  = "latest"
+
+backend_container_port  = 8080
+frontend_container_port = 8080
+frontend_origin         = "https://your-frontend.example"

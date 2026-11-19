@@ -1,3 +1,0 @@
-[alembic]
-script_location = apps/backend/alembic
-sqlalchemy.url = postgresql+asyncpg://admin_user:Transcript123!@34.186.172.121:5432/transcripts

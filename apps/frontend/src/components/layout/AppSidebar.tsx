@@ -1,332 +1,299 @@
-import { Link, useLocation } from 'react-router-dom';
-import { useState, useEffect } from 'react';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
+import { useEffect, useState } from 'react';
+import { useTerm } from '@/contexts/TermContext';
+import { useStaleData } from '@/lib/useStaleData';
+import { useAuth } from '@/contexts/AuthContext';
 import {
+  Home,
+  Building2,
   FileText,
-  GraduationCap,
-  Cloud,
-  Shield,
-  CheckCircle2,
-  Clock,
-  Eye,
-  FileCheck,
-  Brain,
-  UserX,
-  TrendingUp,
   Target,
-  FileUp,
-  Map,
-  ChevronDown,
-  Mail,
+  SlidersHorizontal,
+  ChevronRight,
+  GraduationCap,
+  LifeBuoy,
+  UploadCloud,
+  FolderOpen,
+  FileSpreadsheet,
+  CheckCircle2,
+  XCircle,
+  Clock,
+  Landmark,
+  BookOpen,
+  Sparkles,
+  Settings2,
+  Link2,
+  LayoutTemplate,
+  BarChart3,
+  Wrench,
+  Cog,
+  Goal,
+  TrendingUp,
 } from 'lucide-react';
-import {
-  Sidebar,
-  SidebarContent,
-  SidebarGroup,
-  SidebarGroupContent,
-  SidebarGroupLabel,
-  SidebarMenu,
-  SidebarMenuItem,
-  SidebarMenuButton,
-  SidebarHeader,
-  
-  SidebarFooter,
-} from '@/components/ui/sidebar';
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
+import { Sidebar } from '@/components/ui/sidebar';
 
-interface MenuItem {
-  title: string;
-  icon: any;
-  path?: string;
-  children?: MenuItem[];
-}
+type Leaf = { label: string; path: string; countKey?: string; icon?: any; iconColor?: string; step?: number };
+type Bucket = { key: string; label: string; icon: any; warnKey?: string; to?: string; children: Leaf[] };
 
-const menuItems: MenuItem[] = [
+// Four-bucket workflow (matches the artifact), mapped onto the app's real routes.
+const BUCKETS: Bucket[] = [
   {
-    title: 'Admission Information',
-    icon: Shield,
+    key: 'setup',
+    label: 'Institution Setup',
+    icon: Building2,
+    to: '/institution-setup',
     children: [
-      {
-        title: 'Institutional',
-        icon: Shield,
-        path: '/admission-criteria',
-      },
-      {
-        title: 'Program',
-        icon: GraduationCap,
-        path: '/program-criteria',
-      },
-      {
-        title: 'Course Mapping',
-        icon: Map,
-        path: '/course-mapping',
-      },
+      { label: 'University Admission Rules', path: '/admission-criteria', icon: Landmark, iconColor: '#2563eb' },
+      { label: 'Program Admission Rules', path: '/program-criteria', icon: BookOpen, iconColor: '#7c3aed' },
+      { label: 'Advanced Admission Rules', path: '/term-rules', icon: Sparkles, iconColor: '#d97706' },
+      { label: 'Transcript Settings', path: '/transcript-codes', icon: Settings2, iconColor: '#0891b2' },
+      { label: 'Course Matching', path: '/course-mapping', icon: Link2, iconColor: '#059669' },
     ],
   },
   {
-    title: 'Admission Metrics',
-    icon: Target,
-    children: [
-      {
-        title: 'Enrollment Targets',
-        icon: Target,
-        path: '/admissions/enrollment-goals',
-      },
-      {
-        title: 'Yield',
-        icon: TrendingUp,
-        path: '/admissions/yield',
-      },
-    ],
-  },
-  {
-    title: 'Transcript Uploader',
-    icon: FileUp,
-    children: [
-      {
-        title: 'Cloud Folders',
-        icon: Cloud,
-        path: '/cloud-folders',
-      },
-    ],
-  },
-  {
-    title: 'New Transcript Type',
-    icon: Brain,
-    children: [
-      {
-        title: 'Needs Setup',
-        icon: Clock,
-        path: '/transcripts/new-types/needs-setup',
-      },
-      {
-        title: 'In Setup',
-        icon: CheckCircle2,
-        path: '/transcripts/new-types/in-setup',
-      },
-      {
-        title: 'Ready',
-        icon: FileCheck,
-        path: '/transcripts/new-types/ready',
-      },
-    ],
-  },
-  {
-    title: 'Transcript Detector',
+    key: 'process',
+    label: 'Transcript Intelligence Center',
     icon: FileText,
+    warnKey: 'extract_total',
+    to: '/transcript-intelligence',
     children: [
-      {
-        title: 'Incoming Transcripts',
-        icon: FileText,
-        path: '/detector/incoming',
-      },
-      {
-        title: 'Existing Transcript Type',
-        icon: FileText,
-        path: '/detector/existing',
-      },
-      {
-        title: 'New Transcript Type',
-        icon: FileText,
-        path: '/detector/new-type',
-      },
-      {
-        title: 'Unknown Transcript Type',
-        icon: FileText,
-        path: '/detector/unknown',
-      },
+      { label: 'Upload', path: '/cloud-folders', countKey: 'upload_total', icon: UploadCloud, iconColor: '#2563eb', step: 1 },
+      { label: 'Classify', path: '/classify', countKey: 'classify_total', icon: FolderOpen, iconColor: '#059669', step: 2 },
+      { label: 'Extract', path: '/extract', countKey: 'extract_total', icon: FileSpreadsheet, iconColor: '#7c3aed', step: 3 },
     ],
   },
   {
-    title: 'Transcript Extractor',
-    icon: FileText,
-    children: [
-      {
-        title: 'Completed',
-        icon: CheckCircle2,
-        path: '/extractor/completed',
-      },
-      {
-        title: 'Needs Review',
-        icon: Eye,
-        path: '/extractor/needs-review',
-      },
-      {
-        title: 'Not Processed',
-        icon: Clock,
-        path: '/extractor/not-processed',
-      },
-    ],
-  },
-  {
-    title: 'Admission Decision',
+    key: 'admissions',
+    label: 'Admission Center',
     icon: Target,
+    warnKey: 'decisions_total',
+    to: '/admission-center',
     children: [
-      {
-        title: 'Admitted',
-        icon: CheckCircle2,
-        path: '/decisions/admitted',
-      },
-      {
-        title: 'Denied',
-        icon: UserX,
-        path: '/decisions/denied',
-      },
-      {
-        title: 'Waitlisted',
-        icon: FileText,
-        path: '/decisions/waitlisted',
-      },
-      {
-        title: 'Pending Review',
-        icon: Clock,
-        path: '/decisions/pending',
-      },
-      {
-        title: 'Decision Templates',
-        icon: FileText,
-        path: '/admissions/templates',
-      },
+      { label: 'Admitted', path: '/decisions/admitted', countKey: 'admitted', icon: CheckCircle2, iconColor: '#059669' },
+      { label: 'Denied', path: '/decisions/denied', countKey: 'denied', icon: XCircle, iconColor: '#dc2626' },
+      { label: 'Waitlisted', path: '/decisions/waitlisted', countKey: 'waitlisted', icon: Clock, iconColor: '#d97706' },
+      { label: 'Decision Templates', path: '/admissions/templates', icon: LayoutTemplate, iconColor: '#2563eb' },
+      { label: 'Enrollment Targets', path: '/admissions/enrollment-goals', icon: Goal, iconColor: '#7c3aed' },
+      { label: 'Admission Yield', path: '/admissions/yield', icon: TrendingUp, iconColor: '#0891b2' },
+      { label: 'Reports & Insights', path: '/admissions/reports', icon: BarChart3, iconColor: '#db2777' },
     ],
   },
-  
-  
+  {
+    key: 'extractor',
+    label: 'Extractor Setup Studio',
+    icon: SlidersHorizontal,
+    children: [
+      { label: 'Needs Setup', path: '/transcripts/new-types/needs-setup', countKey: 'needs_setup', icon: Wrench, iconColor: '#d97706' },
+      { label: 'In Setup', path: '/transcripts/new-types/in-setup', countKey: 'in_setup', icon: Cog, iconColor: '#2563eb' },
+      { label: 'Ready', path: '/transcripts/new-types/ready', countKey: 'ready', icon: CheckCircle2, iconColor: '#059669' },
+    ],
+  },
 ];
+
+const resolvePath = (p: string) => `/app${p}`.replace(/\/\//g, '/');
+
+const bucketForPath = (pathname: string): string | null => {
+  for (const b of BUCKETS) {
+    if (b.children.some((c) => resolvePath(c.path) === pathname)) return b.key;
+  }
+  return null;
+};
 
 export function AppSidebar() {
   const location = useLocation();
-  const [openSections, setOpenSections] = useState<string[]>(['Admission Information']);
+  const navigate = useNavigate();
+  const { terms, currentTerm } = useTerm();
+  const { user } = useAuth();
+  const termName = terms.find((t) => t.id === currentTerm)?.term_name;
 
-  // Auto-expand section when child route is active
+  const [openBuckets, setOpenBuckets] = useState<string[]>(['process']);
+
+  // Refetch the badge counts immediately after any action (every action fires an
+  // app-notify event) and on navigation, so the sidebar numbers update instantly
+  // instead of waiting for the polling interval / a hard refresh.
+  const [refreshTick, setRefreshTick] = useState(0);
   useEffect(() => {
-    menuItems.forEach((item) => {
-      if (item.children) {
-        const hasActiveChild = item.children.some((child) => child.path === location.pathname);
-        if (hasActiveChild && !openSections.includes(item.title)) {
-          setOpenSections((prev) => [...prev, item.title]);
-        }
-      }
-    });
+    const bump = () => setRefreshTick((t) => t + 1);
+    window.addEventListener('app-notify', bump);
+    window.addEventListener('focus', bump);
+    document.addEventListener('visibilitychange', bump);
+    return () => {
+      window.removeEventListener('app-notify', bump);
+      window.removeEventListener('focus', bump);
+      document.removeEventListener('visibilitychange', bump);
+    };
+  }, []);
+  useEffect(() => {
+    setRefreshTick((t) => t + 1);
   }, [location.pathname]);
 
-  const toggleSection = (title: string) => {
-    setOpenSections((prev) =>
-      prev.includes(title) ? prev.filter((t) => t !== title) : [...prev, title]
-    );
-  };
+  const { data: counts } = useStaleData<Record<string, number>>(
+    `section-counts:${termName ?? ''}`,
+    async () => {
+      // no-store: without it the browser can serve a cached count response on a
+      // re-fetch, so the badges only changed on a hard refresh (which bypasses
+      // the cache). Force a fresh read every poll / action.
+      const res = await fetch(`/api/extractor/section-counts?term=${encodeURIComponent(termName ?? '')}`, {
+        cache: 'no-store',
+      });
+      if (!res.ok) throw new Error('counts failed');
+      return res.json();
+    },
+    [termName, refreshTick],
+    { refreshIntervalMs: 10000 },
+  );
 
-  const renderMenuItem = (item: MenuItem) => {
-    const Icon = item.icon;
-    const resolvePath = (p?: string) => {
-      if (!p) return '/app';
-      if (p.startsWith('/')) return `/app${p}`;
-      return `/app/${p}`.replace(/\/\//g, '/');
-    };
+  const { data: newTypeCounts } = useStaleData<Record<string, number>>(
+    'section-counts:new-types',
+    async () => {
+      const res = await fetch('/api/classifier-training/school-types/counts', { cache: 'no-store' });
+      if (!res.ok) throw new Error('counts failed');
+      return res.json();
+    },
+    [refreshTick],
+    { refreshIntervalMs: 10000 },
+  );
 
-  const itemTo = item.path ? resolvePath(item.path) : '/app';
-  const active = itemTo === location.pathname;
-  const isOpen = openSections.includes(item.title);
-
-    if (item.children) {
-      return (
-        <Collapsible
-          key={item.title}
-          open={isOpen}
-          onOpenChange={() => toggleSection(item.title)}
-          className="group/collapsible"
-        >
-          <SidebarGroup>
-            <SidebarGroupLabel asChild>
-              <CollapsibleTrigger className="group/label w-full flex items-center gap-2">
-                <span className="uppercase text-xs text-sidebar-foreground/100 flex-1 text-left">{item.title}</span>
-                <ChevronDown className="h-4 w-4 shrink-0 transition-transform group-data-[state=open]/collapsible:rotate-180" />
-              </CollapsibleTrigger>
-            </SidebarGroupLabel>
-            <CollapsibleContent>
-              <SidebarGroupContent>
-                <SidebarMenu>
-                  {item.children.map((child) => {
-                    const ChildIcon = child.icon;
-                    const to = resolvePath(child.path);
-                    const isChildActive = to === location.pathname;
-                    return (
-                      <SidebarMenuItem key={child.path}>
-                        <SidebarMenuButton asChild isActive={isChildActive} className="transition-colors">
-                          <Link
-                            to={to}
-                            className={`flex items-center gap-2 px-3 py-2 rounded-md transition-colors ${
-                              isChildActive ? 'bg-blue-600 text-white' : 'text-slate-350 hover:bg-blue-50'
-                            }`}
-                            >
-                              <ChildIcon className={`h-4 w-4 ${isChildActive ? 'text-white' : 'text-slate-350'}`} />
-                            <span className="text-sm">{child.title}</span>
-                          </Link>
-                        </SidebarMenuButton>
-                      </SidebarMenuItem>
-                    );
-                  })}
-                </SidebarMenu>
-              </SidebarGroupContent>
-            </CollapsibleContent>
-          </SidebarGroup>
-        </Collapsible>
-      );
+  const countOf = (key?: string): number | undefined => {
+    if (!key) return undefined;
+    // Extract = the whole extraction stage: Completed (auto) + Human Review +
+    // Human Review with Audit, so the badge reflects every extracted student, not
+    // just the review queue.
+    if (key === 'extract_total') {
+      const c = counts ?? {};
+      return (c.completed ?? 0) + (c.needs_review ?? 0) + (c.not_processed ?? 0);
     }
-
-  const to = resolvePath(item.path);
-    return (
-      <SidebarMenuItem key={item.path}>
-        <SidebarMenuButton asChild isActive={active} className="transition-colors">
-          <Link
-            to={to}
-            className={`flex items-center gap-2 px-3 py-2 rounded-md transition-colors ${
-                active ? 'bg-blue-600 text-white' : 'text-slate-350 hover:bg-blue-50'
-            }`}
-          >
-            <Icon className={`h-4 w-4 ${active ? 'text-white' : 'text-slate-350'}`} />
-            <span className="text-sm">{item.title}</span>
-          </Link>
-        </SidebarMenuButton>
-      </SidebarMenuItem>
-    );
+    if (key in (newTypeCounts ?? {})) return newTypeCounts?.[key];
+    return counts?.[key];
   };
+
+  // Auto-open the bucket that contains the active route.
+  useEffect(() => {
+    const bk = bucketForPath(location.pathname);
+    if (bk && !openBuckets.includes(bk)) setOpenBuckets((prev) => [...prev, bk]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [location.pathname]);
+
+  const toggleBucket = (key: string) =>
+    setOpenBuckets((prev) => (prev.includes(key) ? prev.filter((k) => k !== key) : [...prev, key]));
+
+  const homeActive = location.pathname === '/app/home';
+
+  const userName = (user as any)?.name || (user as any)?.full_name || (user as any)?.email || 'Signed in';
+  const userInitials =
+    String(userName)
+      .split(/[\s@.]+/)
+      .filter(Boolean)
+      .slice(0, 2)
+      .map((s: string) => s[0]?.toUpperCase())
+      .join('') || 'U';
 
   return (
-    <Sidebar className="bg-white border-r border-slate-100">
-      {/* Header */}
-      <SidebarHeader className="border-b px-4 py-3 bg-white">
-        <Link to="/" className="flex items-center gap-2">
-          <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-br from-blue-400 to-cyan-400 shrink-0">
-            <GraduationCap className="h-5 w-5 text-white" />
-          </div>
-          <div className="group-data-[collapsible=icon]:hidden">
-            <h2 className="text-base font-bold tracking-tight text-slate-900">Highschool</h2>
-            <p className="text-xs text-slate-600">Transcript Depot</p>
+    <Sidebar className="border-r border-[var(--dline)] bg-[var(--dsidebar)] p-0">
+      <div className="dpt-side">
+        {/* Brand */}
+        <Link to="/app/home" className="dpt-brand">
+          <span className="dpt-mk">
+            <GraduationCap className="h-5 w-5" />
+          </span>
+          <div>
+            <b>Highschool Transcript Depot</b>
+            <small>Admissions Intelligence</small>
           </div>
         </Link>
-      </SidebarHeader>
 
-      {/* Content */}
-      <SidebarContent>
-        {menuItems.map(renderMenuItem)}
-      </SidebarContent>
+        {/* Nav */}
+        <nav className="dpt-nav">
+          <Link to="/app/home" className={`dpt-navitem ${homeActive ? 'active' : ''}`}>
+            <Home className="dpt-ic h-4 w-4" />
+            Home
+          </Link>
 
-      {/* Footer */}
-  <SidebarFooter className="border-t p-4 group-data-[collapsible=icon]:hidden bg-white">
-        <div className="space-y-3">
-          <div className="text-xs">
-            <p className="font-medium">California State University, Long Beach</p>
-            <p className="text-sidebar-foreground/70">admin@csulb.edu</p>
-          </div>
-          <div className="flex items-start gap-2 text-xs text-sidebar-foreground/70">
-            <Mail className="h-4 w-4 mt-0.5 shrink-0" />
-            <div>
-              <p className="font-medium">Need help?</p>
-              <p>Contact ira-tech@csulb.edu</p>
+          <div className="dpt-sec">Workflow</div>
+          {BUCKETS.map((b) => {
+            const Icon = b.icon;
+            const open = openBuckets.includes(b.key);
+            const warn = countOf(b.warnKey);
+            const headerActive = b.to ? location.pathname === resolvePath(b.to) : false;
+            const onHeaderClick = () => {
+              if (b.to) {
+                navigate(resolvePath(b.to));
+                setOpenBuckets((prev) => (prev.includes(b.key) ? prev : [...prev, b.key]));
+              } else {
+                toggleBucket(b.key);
+              }
+            };
+            return (
+              <div key={b.key} className={`dpt-navgroup ${open ? 'open' : ''}`}>
+                <button
+                  type="button"
+                  className={`dpt-navitem ${warn ? 'warn' : ''} ${headerActive ? 'active' : ''}`}
+                  onClick={onHeaderClick}
+                >
+                  <Icon className="dpt-ic h-4 w-4" />
+                  {b.label}
+                  {warn ? <span className="dpt-cnt">{warn}</span> : null}
+                  <ChevronRight
+                    className="dpt-chev h-4 w-4"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      toggleBucket(b.key);
+                    }}
+                  />
+                </button>
+                <div className="dpt-subnav">
+                  {b.children.map((c) => {
+                    const to = resolvePath(c.path);
+                    const active = to === location.pathname;
+                    const cnt = countOf(c.countKey);
+                    const LeafIcon = c.icon;
+                    return (
+                      <Link
+                        key={c.path}
+                        to={to}
+                        className={`dpt-navitem ${c.icon ? 'has-ic' : ''} ${c.step ? 'has-step' : ''} ${active ? 'active' : ''}`}
+                      >
+                        {c.step ? (
+                          <span className="dpt-step" style={{ background: c.iconColor }}>
+                            {c.step}
+                          </span>
+                        ) : null}
+                        {LeafIcon ? (
+                          <LeafIcon className="dpt-ic h-4 w-4" style={{ color: c.iconColor }} />
+                        ) : null}
+                        {c.label}
+                        {cnt != null ? <span className="dpt-cnt">{cnt}</span> : null}
+                      </Link>
+                    );
+                  })}
+                </div>
+              </div>
+            );
+          })}
+
+          <div className="dpt-sec">Help</div>
+          <a href="mailto:support@csulb.edu" className="dpt-navitem">
+            <LifeBuoy className="dpt-ic h-4 w-4" />
+            Contact Support
+          </a>
+        </nav>
+
+        {/* User footer */}
+        <div className="dpt-foot">
+          <div className="u">
+            <span
+              className="dpt-avatar"
+              style={{ width: 30, height: 30, fontSize: 11, background: 'linear-gradient(135deg,#db2777,#7c3aed)' }}
+            >
+              {userInitials}
+            </span>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <b className="truncate">{userName}</b>
+              <span className="block truncate">{(user as any)?.institution?.name || 'Admissions'}</span>
             </div>
           </div>
         </div>
-      </SidebarFooter>
+      </div>
     </Sidebar>
   );
 }
-

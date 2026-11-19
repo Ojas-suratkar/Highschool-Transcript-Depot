@@ -28,6 +28,11 @@ apps/backend/.env
 apps/backend/cloudsql/service-account.json
 cloudsql/
 *.json
+!tsconfig.json
+!tsconfig.app.json
+!tsconfig.node.json
+!package.json
+!package-lock.json
 
 # Database
 *.db
@@ -65,3 +70,19 @@ infra/*.tfvars
 *.tmp
 *.temp
 .cache/
+
+# scratch data exports / screenshots — keep out of the repo
+*.xlsx
+Screenshot*.png
+*_export.csv
+
+# secrets, local state and real student data
+terraform.tfvars
+*.tfstate*
+.terraform/
+*.env
+.env*
+!.env.example
+*key*.json
+apps/backend/scripts/tmp_docai_raw/
+lab/data/

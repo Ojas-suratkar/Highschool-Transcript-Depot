@@ -1,0 +1,204 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Transcript Extraction Lab</title>
+<style>
+  :root {
+    --bg: #0f1420; --panel: #171d2b; --panel2: #1e2637; --line: #2b3448;
+    --ink: #e6ebf5; --ink2: #9aa6bd; --accent: #5b9dff; --good: #34d399;
+    --warn: #fbbf24; --bad: #f87171;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; font: 14px/1.5 -apple-system, system-ui, sans-serif; background: var(--bg); color: var(--ink); }
+  header { padding: 14px 20px; border-bottom: 1px solid var(--line); display: flex; align-items: center; gap: 16px; flex-wrap: wrap; }
+  header h1 { font-size: 16px; margin: 0; font-weight: 700; }
+  .muted { color: var(--ink2); }
+  .pill { font-size: 11px; padding: 3px 9px; border-radius: 999px; border: 1px solid var(--line); background: var(--panel2); }
+  button { font: inherit; cursor: pointer; border: 1px solid var(--line); background: var(--panel2); color: var(--ink); padding: 7px 13px; border-radius: 8px; }
+  button.primary { background: var(--accent); border-color: var(--accent); color: #04122c; font-weight: 600; }
+  button:disabled { opacity: .5; cursor: default; }
+  .layout { display: grid; grid-template-columns: 240px 1fr; height: calc(100vh - 56px); }
+  .sidebar { border-right: 1px solid var(--line); overflow: auto; padding: 12px; }
+  .runitem { padding: 9px 10px; border-radius: 8px; cursor: pointer; border: 1px solid transparent; }
+  .runitem:hover { background: var(--panel); }
+  .runitem.active { background: var(--panel); border-color: var(--line); }
+  .runitem .fn { font-weight: 600; font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .main { overflow: auto; padding: 18px 22px; }
+  .split { display: grid; grid-template-columns: minmax(320px, 45%) 1fr; gap: 20px; align-items: start; }
+  .card { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 16px; margin-bottom: 16px; }
+  .card h3 { margin: 0 0 10px; font-size: 13px; text-transform: uppercase; letter-spacing: .04em; color: var(--ink2); }
+  img.page { width: 100%; border-radius: 8px; border: 1px solid var(--line); margin-bottom: 10px; background: #fff; }
+  table { width: 100%; border-collapse: collapse; font-size: 12.5px; }
+  th, td { text-align: left; padding: 6px 8px; border-bottom: 1px solid var(--line); vertical-align: top; }
+  th { color: var(--ink2); font-weight: 600; position: sticky; top: 0; background: var(--panel); }
+  tr.review td { background: rgba(248,113,113,.09); }
+  .kv { display: grid; grid-template-columns: auto 1fr; gap: 4px 14px; font-size: 13px; }
+  .kv .k { color: var(--ink2); }
+  .flag { display: inline-block; font-size: 10.5px; padding: 1px 6px; border-radius: 6px; background: rgba(248,113,113,.16); color: #fca5a5; margin: 1px 2px 1px 0; }
+  .badge { display: inline-block; font-size: 11px; padding: 3px 10px; border-radius: 999px; font-weight: 600; }
+  .badge.good { background: rgba(52,211,153,.15); color: var(--good); }
+  .badge.bad { background: rgba(248,113,113,.15); color: var(--bad); }
+  .badge.warn { background: rgba(251,191,36,.15); color: var(--warn); }
+  .metric { display: flex; gap: 18px; flex-wrap: wrap; font-size: 12.5px; }
+  .metric div b { color: var(--ink); } .metric div { color: var(--ink2); }
+  pre { background: var(--panel2); border: 1px solid var(--line); border-radius: 8px; padding: 12px; overflow: auto; font-size: 11.5px; max-height: 340px; }
+  details summary { cursor: pointer; color: var(--ink2); font-size: 12px; }
+  .empty { color: var(--ink2); padding: 40px; text-align: center; }
+  a { color: var(--accent); }
+</style>
+</head>
+<body>
+<header>
+  <h1>🧪 Transcript Extraction Lab</h1>
+  <span class="pill" id="vlmpill">checking VLM…</span>
+  <div style="flex:1"></div>
+  <label class="pill" style="cursor:pointer">
+    Upload PDF <input id="file" type="file" accept="application/pdf" style="display:none" />
+  </label>
+  <button id="sampleBtn">Generate sample transcript</button>
+</header>
+
+<div class="layout">
+  <div class="sidebar">
+    <div class="muted" style="font-size:12px;margin-bottom:8px">RUNS</div>
+    <div id="runs"></div>
+  </div>
+  <div class="main" id="main">
+    <div class="empty">Upload a transcript PDF or generate a sample to begin.</div>
+  </div>
+</div>
+
+<script>
+const $ = (s, r=document) => r.querySelector(s);
+let activeId = null;
+
+async function j(url, opts) {
+  const r = await fetch(url, opts);
+  if (!r.ok) throw new Error((await r.json().catch(()=>({}))).detail || r.statusText);
+  return r.json();
+}
+
+async function health() {
+  try {
+    const h = await j('/api/health');
+    const v = h.vlm || {};
+    const ok = v.reachable && (v.model_present !== false);
+    $('#vlmpill').textContent = `${v.provider}: ${v.model} ${ok ? '✓' : '✗ (not ready)'}`;
+    $('#vlmpill').style.color = ok ? 'var(--good)' : 'var(--bad)';
+  } catch { $('#vlmpill').textContent = 'VLM: offline'; }
+}
+
+async function loadRuns() {
+  const runs = await j('/api/runs');
+  const el = $('#runs');
+  el.innerHTML = runs.map(r => `
+    <div class="runitem ${r.id===activeId?'active':''}" data-id="${r.id}">
+      <div class="fn">#${r.id} ${r.filename}</div>
+      <div class="muted" style="font-size:11px">${r.status}${r.page_count?` · ${r.page_count}p`:''}${r.latency_ms?` · ${(r.latency_ms/1000).toFixed(1)}s`:''}</div>
+    </div>`).join('') || '<div class="muted" style="font-size:12px">No runs yet.</div>';
+  el.querySelectorAll('.runitem').forEach(n => n.onclick = () => selectRun(+n.dataset.id));
+}
+
+function flags(arr) { return (arr||[]).map(f => `<span class="flag">${f}</span>`).join(''); }
+function esc(s) { return String(s==null?'':s).replace(/[&<>]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;'}[c])); }
+
+async function selectRun(id) {
+  activeId = id;
+  await loadRuns();
+  const run = await j('/api/runs/' + id);
+  const res = run.result;
+  const pages = Array.from({length: run.page_count||1}, (_,i)=>i+1);
+  const imgs = pages.map(p => `<img class="page" src="/api/page/${id}/${p}?t=${Date.now()}" onerror="this.style.display='none'"/>`).join('');
+
+  let right;
+  if (!res) {
+    right = `<div class="card"><button class="primary" id="extractBtn">Run extraction</button>
+      <p class="muted" style="margin-top:10px">Runs one VLM pass, then the deterministic verification gates.</p></div>`;
+  } else {
+    const v = res.verification || {};
+    const badge = v.doc_verified
+      ? '<span class="badge good">VERIFIED — no review needed</span>'
+      : `<span class="badge ${v.needs_review_rows||v.doc_flags?.length ? 'bad':'warn'}">NEEDS REVIEW</span>`;
+    const rows = (res.courses||[]).map((c, i) => `
+      <tr class="${c.needs_review?'review':''}">
+        <td style="color:var(--ink2);text-align:right">${i+1}</td>
+        <td>${esc(c.term)}</td><td>${esc(c.course_id)}</td><td>${esc(c.title)}</td>
+        <td>${esc(c.grade)}</td><td>${esc(c.credit_attempted)}</td><td>${esc(c.credit_completed)}</td>
+        <td>${c.confidence!=null?Number(c.confidence).toFixed(2):''}</td>
+        <td>${flags(c.flags)}</td>
+      </tr>`).join('');
+    right = `
+      <div class="card">
+        <h3>Result &nbsp; ${badge}</h3>
+        <div class="metric" style="margin-bottom:10px">
+          <div>model <b>${esc(res.model)}</b></div>
+          <div>latency <b>${res.latency_ms?(res.latency_ms/1000).toFixed(1)+'s':'—'}</b></div>
+          <div>anchor tokens <b>${res.anchor_token_count??'—'}</b></div>
+          <div>text layer <b>${res.has_text_layer?'yes':'no'}</b></div>
+        </div>
+        <div class="kv">
+          <div class="k">School</div><div>${esc(res.issuer?.school_name)}</div>
+          <div class="k">Student</div><div>${esc(res.student?.name)}</div>
+          <div class="k">Printed GPA</div><div>${esc(res.issuer?.printed_totals?.gpa)}</div>
+          <div class="k">Printed total credits</div><div>${esc(res.issuer?.printed_totals?.total_credits)}</div>
+        </div>
+      </div>
+      <div class="card">
+        <h3>Verification</h3>
+        <div class="metric">
+          <div>rows <b>${v.total_rows??0}</b></div>
+          <div>verified <b style="color:var(--good)">${v.verified_rows??0}</b></div>
+          <div>needs review <b style="color:var(--bad)">${v.needs_review_rows??0}</b></div>
+          <div>expected count <b>${v.expected_row_count??'—'}</b> ${v.row_count_ok?'✓':'✗'}</div>
+        </div>
+        <div class="metric" style="margin-top:8px">
+          <div>Σ credits completed <b>${v.sum_credit_completed??'—'}</b></div>
+          <div>printed credits <b>${v.printed_total_credits??'—'}</b></div>
+          <div>reconcile <b style="color:${v.credits_reconcile===true?'var(--good)':v.credits_reconcile===false?'var(--bad)':'var(--ink2)'}">${v.credits_reconcile===true?'yes ✓':v.credits_reconcile===false?`no (Δ ${v.credits_delta})`:'n/a'}</b></div>
+        </div>
+        <div style="margin-top:8px">${flags(v.doc_flags)}</div>
+      </div>
+      <div class="card">
+        <h3>Extracted courses</h3>
+        <div style="overflow:auto"><table>
+          <thead><tr><th>#</th><th>Term</th><th>ID</th><th>Title</th><th>Mark</th><th>Cr att</th><th>Cr comp</th><th>Conf</th><th>Flags</th></tr></thead>
+          <tbody>${rows||'<tr><td colspan=9 class="muted">no rows</td></tr>'}</tbody>
+        </table></div>
+      </div>
+      <div class="card">
+        <details><summary>Raw VLM output</summary><pre>${esc(res.raw_vlm_text)}</pre></details>
+        <button id="extractBtn" style="margin-top:10px">Re-run extraction</button>
+      </div>`;
+  }
+
+  $('#main').innerHTML = `<div class="split">
+    <div><div class="card"><h3>Transcript (page image)</h3>${imgs}
+      <a href="/api/pdf/${id}" target="_blank">open original PDF ↗</a></div></div>
+    <div>${right}</div></div>`;
+
+  const btn = $('#extractBtn');
+  if (btn) btn.onclick = async () => {
+    btn.disabled = true; btn.textContent = 'Extracting… (local VLM, may take 20–90s)';
+    try { await j('/api/extract/' + id, {method:'POST'}); await selectRun(id); }
+    catch (e) { alert('Extraction failed: ' + e.message); btn.disabled = false; btn.textContent = 'Run extraction'; }
+  };
+}
+
+$('#file').onchange = async (e) => {
+  const f = e.target.files[0]; if (!f) return;
+  const fd = new FormData(); fd.append('file', f);
+  const run = await j('/api/upload', {method:'POST', body: fd});
+  await selectRun(run.id);
+};
+$('#sampleBtn').onclick = async () => {
+  $('#sampleBtn').disabled = true; $('#sampleBtn').textContent = 'Generating…';
+  try { const run = await j('/api/sample', {method:'POST'}); await selectRun(run.id); }
+  finally { $('#sampleBtn').disabled = false; $('#sampleBtn').textContent = 'Generate sample transcript'; }
+};
+
+health(); loadRuns();
+</script>
+</body>
+</html>
