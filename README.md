@@ -2,6 +2,23 @@
 
 A full-stack web application for managing high school transcripts with automated extraction, verification, and admissions workflows.
 
+> Screenshots below use sample data only. No real student records are shown.
+
+<table>
+  <tr>
+    <td align="center" width="50%"><img src="docs/screenshots/landing.png" alt="Landing page" /><br/><b>Landing page and pipeline</b></td>
+    <td align="center" width="50%"><img src="docs/screenshots/admission-dashboard.png" alt="Admission dashboard" /><br/><b>Admission dashboard</b></td>
+  </tr>
+  <tr>
+    <td align="center"><img src="docs/screenshots/admission-criteria.png" alt="Admission criteria" /><br/><b>GPA and A-G criteria with transparency preview</b></td>
+    <td align="center"><img src="docs/screenshots/course-mapping.png" alt="Course mapping" /><br/><b>Course mapping with auto-suggest</b></td>
+  </tr>
+  <tr>
+    <td align="center"><img src="docs/screenshots/trainer-dashboard.png" alt="Trainer dashboard" /><br/><b>Self-onboarding of new transcript formats</b></td>
+    <td align="center"><img src="docs/screenshots/needs-review.png" alt="Needs review queue" /><br/><b>Human review queue for low-confidence cases</b></td>
+  </tr>
+</table>
+
 ## 🏗️ Project Structure
 
 ```
